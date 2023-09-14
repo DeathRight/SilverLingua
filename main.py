@@ -4,6 +4,7 @@ from SilverLingua.core.atoms.prompt import prompt
 from SilverLingua.core.atoms.tool.util import generate_function_json
 
 
+#test
 @prompt
 def fruit_prompt(fruits: list):
   """
