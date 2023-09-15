@@ -1,43 +1,16 @@
-import inspect
-import logging
 import random
 
-from loguru import logger
-
+from logging_config import logger
 from SilverLingua.core.atoms.prompt import prompt
 from SilverLingua.core.atoms.tool.util import generate_function_json
 from SilverLingua.util import timeit
 
 
-class InterceptHandler(logging.Handler):
-
-  def emit(self, record: logging.LogRecord) -> None:
-    # Get corresponding Loguru level if it exists.
-    level: str | int
-    try:
-      level = logger.level(record.levelname).name
-    except ValueError:
-      level = record.levelno
-
-    # Find caller from where originated the logged message.
-    frame, depth = inspect.currentframe(), 0
-    while frame and (depth == 0
-                     or frame.f_code.co_filename == logging.__file__):
-      frame = frame.f_back
-      depth += 1
-
-    logger.opt(depth=depth,
-               exception=record.exc_info).log(level, record.getMessage())
-
-
-logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-
-
-#test
-@prompt
+# test
 @timeit
+@prompt
 def fruit_prompt(fruits: list):
-  """
+    """
     You are a helpful assistant that takes a list of fruit and gives information about their nutrition.
 
     LIST OF FRUIT:
@@ -50,12 +23,14 @@ logger.debug(fruit_prompt(["apple", "orange"]))
 
 
 ##########
-def roll_dice(sides: int = 20,
-              dice: int = 1,
-              modifier: int = 0,
-              advantage: bool = False,
-              disadvantage: bool = False):
-  """
+def roll_dice(
+    sides: int = 20,
+    dice: int = 1,
+    modifier: int = 0,
+    advantage: bool = False,
+    disadvantage: bool = False,
+):
+    """
     Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage. Returns `{result: int, rolls: int[]}`
 
     Args:
@@ -65,25 +40,25 @@ def roll_dice(sides: int = 20,
         advantage: Whether to roll with advantage (default False)
         disadvantage: Whether to roll with disadvantage (default False)
     """
-  if advantage and disadvantage:
-    raise ValueError("Can't roll with both advantage and disadvantage.")
+    if advantage and disadvantage:
+        raise ValueError("Can't roll with both advantage and disadvantage.")
 
-  # Ensure at least two dice are rolled if advantage or disadvantage is specified
-  if advantage or disadvantage:
-    dice = max(2, dice)
+    # Ensure at least two dice are rolled if advantage or disadvantage is specified
+    if advantage or disadvantage:
+        dice = max(2, dice)
 
-  rolls = [random.randint(1, sides) for _ in range(dice)]
+    rolls = [random.randint(1, sides) for _ in range(dice)]
 
-  if advantage:
-    roll_result = max(rolls)
-  elif disadvantage:
-    roll_result = min(rolls)
-  else:
-    roll_result = sum(rolls)
+    if advantage:
+        roll_result = max(rolls)
+    elif disadvantage:
+        roll_result = min(rolls)
+    else:
+        roll_result = sum(rolls)
 
-  ret = {"result": roll_result + modifier, "rolls": rolls}
-  print(f"Rolled {ret}")
-  return ret
+    ret = {"result": roll_result + modifier, "rolls": rolls}
+    print(f"Rolled {ret}")
+    return ret
 
 
 logger.debug(generate_function_json(roll_dice))

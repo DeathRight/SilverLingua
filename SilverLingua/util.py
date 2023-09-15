@@ -1,11 +1,10 @@
 import logging
 import time
-from enum import Enum, EnumMeta
 from functools import wraps
 
 
 def timeit(func):
-  """
+    """
     Decorator to time the execution of a function and log the time taken.
 
     Usage:
@@ -16,50 +15,80 @@ def timeit(func):
     The time taken for 'my_function' will be logged.
     """
 
-  @wraps(func)
-  def wrapper(*args, **kwargs):
-    # Dynamically grab the logger based on the module where `func` is defined
-    logger = logging.getLogger(func.__module__)
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Dynamically grab the logger based on the module where `func` is defined
+        logger = logging.getLogger(func.__module__)
 
-    start = time.time()
-    result = func(*args, **kwargs)
-    end = time.time()
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
 
-    logger.debug(
-        f"[{func.__name__}] finished. Time taken: {end - start:.4f} seconds")
+        logger.debug(
+            f"[{func.__name__}] finished. Time taken: {end - start:.4f} seconds"
+        )
 
-    return result
+        return result
 
-  return wrapper
+    return wrapper
 
 
-class MatchingNameEnum(Enum):
-  """
-    A base Enum class that uses __init_subclass__ to enforce that 
-    all derived Enums have the same names as itself.
-    
-    Raises:
-        TypeError: If the derived enum does not have the same names as the base enum.
+class MatchingNameEnum:
     """
-  def __init_subclass__(cls, **kwargs):
-    super().__init_subclass__(**kwargs)
+    A custom Enum that ensures that all derived Enums have the same names.
+    They can have different values.
 
-    base = cls.__bases__[0]
-    base_keys = set(getattr(base, '__members__', {}).keys())
-    derived_keys = set(getattr(cls, '__members__', {}).keys())
+    This allows grandchild classes to be used interchangeably with their
+    parent classes. (e.g., `ChatRole` and `OpenAIChatRole`)
 
-    missing_keys = base_keys - derived_keys
-    extra_keys = derived_keys - base_keys
+    Raises:
+        TypeError: If a subclass of a child does not have the same names as
+        the child.
+    """
 
-    if missing_keys or extra_keys:
-      error_message = (
-          f"Enum {cls.__name__} must have the same names as its base enum {base.__name__}."
-      )
+    @classmethod
+    def keys(cls):
+        return [key for key in cls.__dict__ if not key.startswith("_")]
 
-      if missing_keys:
-        error_message += f" Missing keys: {', '.join(missing_keys)}. "
+    @classmethod
+    def values(cls):
+        return [value for key, value in cls.__dict__.items() if not key.startswith("_")]
 
-      if extra_keys:
-        error_message += f" Extra keys: {', '.join(extra_keys)}."
+    @classmethod
+    def items(cls):
+        return [
+            (key, value)
+            for key, value in cls.__dict__.items()
+            if not key.startswith("_")
+        ]
 
-      raise TypeError(error_message)
+    @classmethod
+    def __iter__(cls):
+        for key in cls:
+            yield key
+
+    @classmethod
+    def __init_subclass__(cls):
+        # Check if it's a subclass of a subclass of MatchingNameEnum (i.e., a grandchild)
+        if any(
+            issubclass(base, MatchingNameEnum) and base != MatchingNameEnum
+            for base in cls.__bases__
+        ):
+            base_cls = next(
+                base for base in cls.__bases__ if issubclass(base, MatchingNameEnum)
+            )
+            base_keys = set(base_cls.keys())
+            derived_keys = set(cls.keys())
+
+            extra_keys = derived_keys - base_keys
+            missing_keys = base_keys - derived_keys
+
+            if extra_keys or missing_keys:
+                error_message = []
+                if missing_keys:
+                    error_message.append(f"\nMissing keys: {', '.join(missing_keys)}")
+                if extra_keys:
+                    error_message.append(f"\nExtra keys: {', '.join(extra_keys)}")
+                raise TypeError(
+                    f"{cls.__name__} must have the same keys as {base_cls.__name__}. {' '.join(error_message)}"
+                )
