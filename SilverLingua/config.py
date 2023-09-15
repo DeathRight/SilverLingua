@@ -1,25 +1,14 @@
+import os
 from enum import Enum
 from typing import List, Optional, Type
 
-
-class ChatRole(Enum):
-  SYSTEM = "SYSTEM"
-  HUMAN = "HUMAN"
-  AI = "AI"
-  TOOL_CALL = "TOOL_CALL"
-  TOOL_RESPONSE = "TOOL_RESPONSE"
-
-
-class OpenAIChatRole(Enum):
-  SYSTEM = "system"
-  HUMAN = "user"
-  AI = "assistant"
-  TOOL_CALL = "function_call"
-  TOOL_RESPONSE = "function"
+from .core.atoms.roles import ChatRole, OpenAIChatRole
+from .core.atoms.tool import Tool
 
 
 class Config:
   chat_roles: List[Type[Enum]]
+  tools: List[Tool]
 
   def __init__(self):
     self.chat_roles = [ChatRole, OpenAIChatRole]
