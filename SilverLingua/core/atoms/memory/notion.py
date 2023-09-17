@@ -8,13 +8,12 @@ from ..roles import ChatRole, ReactRole
 
 class Notion(Memory):
     """
-    A memory that stores the role associated with it's content.
+    A memory that stores the role associated with its content.
 
-    The role is usually 'SYSTEM', 'HUMAN', 'AI', etc.
-    (See `config`)
+    The role is usually a `ChatRole` or a `ReactRole`.
+    (See `atoms/roles`)
 
-    However, it can also be a ReAct role, such as
-    'Thought', 'Observation', 'Action', etc.
+
     """
 
     role: str
@@ -22,9 +21,7 @@ class Notion(Memory):
     def __init__(self, content: str, role: Any) -> None:
         super().__init__(content)
 
-        if isinstance(role, ChatRole) or (
-            hasattr(role, "name") and hasattr(role, "value")
-        ):
+        if hasattr(role, "name") and hasattr(role, "value"):
             self.role = role.value
         elif isinstance(role, str):
             self.role = role

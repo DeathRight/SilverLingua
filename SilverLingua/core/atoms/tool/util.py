@@ -1,42 +1,43 @@
 import inspect
-import json
 import re
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type, TypedDict, Union
+from typing import Any, Callable, Dict, Optional, Type, TypedDict, Union
 
 
 class FunctionCall(TypedDict):
-  """
+    """
     The JSON output of a function call from the OpenAI ChatCompletion API.
 
     When the AI attempts to call a function, this is the schema.
     """
-  name: str
-  arguments: dict[str, Any]
+
+    name: str
+    arguments: dict[str, Any]
 
 
 class Parameter(TypedDict, total=False):
-  """
+    """
     The parameter of a function according to JSON schema standards.
     (Used by OpenAI function calling)
     """
-  type: str
-  description: Optional[str]
-  enum: Optional[list[str]]
+
+    type: str
+    description: Optional[str]
+    enum: Optional[list[str]]
 
 
 class Parameters(TypedDict, total=False):
-  """
+    """
     The parameters property of a function according to
     JSON schema standards. (Used by OpenAI function calling)
     """
-  type: str
-  properties: dict[str, Parameter]
-  required: list[str]
+
+    type: str
+    properties: dict[str, Parameter]
+    required: list[str]
 
 
 class FunctionJSONSchema(TypedDict):
-  """
+    """
     A function according to JSON schema standards.
 
     This is also passed in to OpenAI ChatCompletion API
@@ -81,95 +82,96 @@ class FunctionJSONSchema(TypedDict):
     }
     ```
     """
-  name: str
-  description: str
-  parameters: Parameters
+
+    name: str
+    description: str
+    parameters: Parameters
 
 
 ##########################################################################################
 # Global Functions
 ##########################################################################################
-def python_type_to_json_schema_type(
-    python_type: Type[Any]) -> Union[str, Dict]:
-  """
-  Maps Python types to JSON Schema types.
+def python_type_to_json_schema_type(python_type: Type[Any]) -> Union[str, Dict]:
+    """
+    Maps Python types to JSON Schema types.
 
-  Args:
-    python_type: The Python type.
+    Args:
+      python_type: The Python type.
 
-  Returns:
-    Union[str, Dict]: The corresponding JSON Schema type or schema.
-  """
-  simple_type_mapping = {
-      int: "integer",
-      float: "number",
-      str: "string",
-      bool: "boolean",
-      type(None): "null"
-  }
-
-  if python_type in simple_type_mapping:
-    return simple_type_mapping[python_type]
-
-  if hasattr(python_type, '__origin__'):
-    origin = python_type.__origin__  # type: ignore
-
-    if origin is Union:
-      types = python_type.__args__  # type: ignore
-      if type(None) in types:
-        # This is equivalent to Optional[T]
-        types = [t for t in types if t is not type(None)]
-        if len(types) == 1:
-          return python_type_to_json_schema_type(types[0])
-
-    if origin is list:
-      item_type = python_type.__args__[
-          0] if python_type.__args__ else Any  # type: ignore
-      return {
-          "type": "array",
-          "items": {
-              "type": python_type_to_json_schema_type(item_type)
-          }
-      }
-    elif origin is dict:
-      key_type = python_type.__args__[
-          0] if python_type.__args__ else Any  # type: ignore
-      value_type = python_type.__args__[
-          1] if python_type.__args__ else Any  # type: ignore
-      if key_type is not str:
-        raise ValueError(
-            "Dictionary key type must be str for conversion to JSON schema")
-      return {
-          "type": "object",
-          "additionalProperties": python_type_to_json_schema_type(value_type)
-      }
-
-  if hasattr(python_type, "__annotations__"):
-    properties = {}
-    for k, v in python_type.__annotations__.items():
-      type_schema = python_type_to_json_schema_type(v)
-      if isinstance(type_schema, str):
-        properties[k] = {"type": type_schema}
-      elif isinstance(type_schema, dict):
-        properties[k] = type_schema
-    required = [
-        k for k in properties
-        if k not in python_type.__optional_keys__  # type: ignore
-    ]
-    return {
-        "type": "object",
-        "properties": properties,
-        **({
-            "required": required
-        } if required else {})
+    Returns:
+      Union[str, Dict]: The corresponding JSON Schema type or schema.
+    """
+    simple_type_mapping = {
+        int: "integer",
+        float: "number",
+        str: "string",
+        bool: "boolean",
+        type(None): "null",
     }
 
-  print(f"Unknown type encountered: {python_type}")
-  return "unknown"
+    if python_type in simple_type_mapping:
+        return simple_type_mapping[python_type]
+
+    if hasattr(python_type, "__origin__"):
+        origin = python_type.__origin__  # type: ignore
+
+        if origin is Union:
+            types = python_type.__args__  # type: ignore
+            if type(None) in types:
+                # This is equivalent to Optional[T]
+                types = [t for t in types if t is not type(None)]
+                if len(types) == 1:
+                    return python_type_to_json_schema_type(types[0])
+
+        if origin is list:
+            item_type = (
+                python_type.__args__[0] if python_type.__args__ else Any
+            )  # type: ignore
+            return {
+                "type": "array",
+                "items": {"type": python_type_to_json_schema_type(item_type)},
+            }
+        elif origin is dict:
+            key_type = (
+                python_type.__args__[0] if python_type.__args__ else Any
+            )  # type: ignore
+            value_type = (
+                python_type.__args__[1] if python_type.__args__ else Any
+            )  # type: ignore
+            if key_type is not str:
+                raise ValueError(
+                    "Dictionary key type must be str for conversion to JSON schema"
+                )
+            return {
+                "type": "object",
+                "additionalProperties": python_type_to_json_schema_type(value_type),
+            }
+
+    if hasattr(python_type, "__annotations__"):
+        properties = {}
+        for k, v in python_type.__annotations__.items():
+            type_schema = python_type_to_json_schema_type(v)
+            if isinstance(type_schema, str):
+                properties[k] = {"type": type_schema}
+            elif isinstance(type_schema, dict):
+                properties[k] = type_schema
+        required = [
+            k
+            for k in properties
+            if k not in python_type.__optional_keys__  # type: ignore
+        ]
+        return {
+            "type": "object",
+            "properties": properties,
+            **({"required": required} if required else {}),
+        }
+
+    print(f"Unknown type encountered: {python_type}")
+    return "unknown"
 
 
 def generate_function_json(func: Callable[..., Any]) -> FunctionJSONSchema:
-  """
+    """
     Generates a FunctionJSONSchema from a python function.
 
     Example:
@@ -180,9 +182,9 @@ def generate_function_json(func: Callable[..., Any]) -> FunctionJSONSchema:
                   advantage: bool = False,
                   disadvantage: bool = False):
         \"""
-        Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage. 
+        Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage.
         Returns `{result: int, rolls: int[]}`
-        
+
         Args:
             sides: The number of sides on each die
             dice: The number of dice to roll (default 1)
@@ -231,62 +233,63 @@ def generate_function_json(func: Callable[..., Any]) -> FunctionJSONSchema:
         }
     }
     ```
-  """
-  sig = inspect.signature(func)
-  doc = inspect.getdoc(func)
+    """
+    sig = inspect.signature(func)
+    doc = inspect.getdoc(func)
 
-  description = ""
-  args_docs = {}
-  if doc:
-    doc_lines = doc.split("\n")
-    description = doc_lines[
-        0]  # Capture the first line as part of the description.
-    args_lines = doc_lines[1:]
+    description = ""
+    args_docs = {}
+    if doc:
+        doc_lines = doc.split("\n")
+        description = doc_lines[0]  # Capture the first line as part of the description.
+        args_lines = doc_lines[1:]
 
-    # Initialize a flag for capturing the description
-    capturing_description = True
+        # Initialize a flag for capturing the description
+        capturing_description = True
 
-    # Look for the "Args" or "Arguments" keyword before starting to capture
-    start_capturing = False
-    for line in args_lines:
-      if line.strip().lower() in ["args:", "arguments:"]:
-        start_capturing = True
-        capturing_description = False
-        continue
+        # Look for the "Args" or "Arguments" keyword before starting to capture
+        start_capturing = False
+        for line in args_lines:
+            if line.strip().lower() in ["args:", "arguments:"]:
+                start_capturing = True
+                capturing_description = False
+                continue
 
-      if capturing_description:
-        # Keep appending to the description
-        description += "\n" + line
-      elif start_capturing:
-        # Capture the argument name and description
-        match = re.match(r"^\s+(?P<name>\w+):\s(?P<desc>.*)", line)
-        if match:
-          args_docs[match.group('name')] = {"description": match.group('desc')}
+            if capturing_description:
+                # Keep appending to the description
+                description += "\n" + line
+            elif start_capturing:
+                # Capture the argument name and description
+                match = re.match(r"^\s+(?P<name>\w+):\s(?P<desc>.*)", line)
+                if match:
+                    args_docs[match.group("name")] = {
+                        "description": match.group("desc")
+                    }
 
-  properties = {}
-  required = []
-  for name, param in sig.parameters.items():
-    param_type = param.annotation if param.annotation is not inspect._empty else Any
-    type_schema = python_type_to_json_schema_type(param_type)
+    properties = {}
+    required = []
+    for name, param in sig.parameters.items():
+        param_type = param.annotation if param.annotation is not inspect._empty else Any
+        type_schema = python_type_to_json_schema_type(param_type)
 
-    properties[name] = {
-        "description": args_docs.get(name, {}).get("description", None)
+        properties[name] = {
+            "description": args_docs.get(name, {}).get("description", None)
+        }
+        if isinstance(type_schema, str):
+            properties[name]["type"] = type_schema
+        elif isinstance(type_schema, dict):
+            properties[name].update(type_schema)
+
+        if param.default is param.empty:
+            required.append(name)
+
+    parameters: Parameters = {"type": "object", "properties": properties}
+
+    if required:
+        parameters["required"] = required
+
+    return {
+        "name": func.__name__,
+        "description": description.strip(),
+        "parameters": parameters,
     }
-    if isinstance(type_schema, str):
-      properties[name]["type"] = type_schema
-    elif isinstance(type_schema, dict):
-      properties[name].update(type_schema)
-
-    if param.default is param.empty:
-      required.append(name)
-
-  parameters: Parameters = {"type": "object", "properties": properties}
-
-  if required:
-    parameters["required"] = required
-
-  return {
-      "name": func.__name__,
-      "description": description.strip(),
-      "parameters": parameters
-  }

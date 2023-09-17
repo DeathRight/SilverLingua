@@ -1,8 +1,7 @@
 import random
 
 from logging_config import logger
-from SilverLingua.core.atoms.prompt import prompt
-from SilverLingua.core.atoms.tool.util import generate_function_json
+from SilverLingua.core.atoms import Tool, prompt
 from SilverLingua.util import timeit
 
 
@@ -61,4 +60,4 @@ def roll_dice(
     return ret
 
 
-logger.debug(generate_function_json(roll_dice))
+logger.debug(Tool(roll_dice).name)

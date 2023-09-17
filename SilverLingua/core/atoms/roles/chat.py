@@ -1,52 +1,35 @@
-from ....util import MatchingNameEnum
+from ....util import ImmutableMixin
+from .role import RoleMember
 
 
-# A base enum for chat roles. Any derived enum must have the same names.
-class ChatRole(MatchingNameEnum):
-    """
-    A base Enum representing various chat roles. When subclassing, ensure that the
-    new Enum has exactly the same names as this base Enum for interoperability.
+class ChatRole(ImmutableMixin):
+    SYSTEM = RoleMember("SYSTEM", "SYSTEM")
+    HUMAN = RoleMember("HUMAN", "HUMAN")
+    AI = RoleMember("AI", "AI")
+    TOOL_CALL = RoleMember("TOOL_CALL", "TOOL_CALL")
+    TOOL_RESPONSE = RoleMember("TOOL_RESPONSE", "TOOL_RESPONSE")
 
-    Raises:
-        TypeError: If a subclass does not have the same names as this base Enum.
-
-    Example:
-        ```python
-            class MyChatRole(ChatRole):
-                SYSTEM = "system"
-                HUMAN = "user"
-                AI = "ai"
-                TOOL_CALL = "TOOL_CALL"
-                TOOL_RESPONSE = "TOOL_RESPONSE"
-        ```
-        This is ok! The names match.
-
-        ```python
-            class MyChatRole(ChatRole):
-                SYSTEM = "system"
-                HUMAN = "user"
-                AI = "ai"
-                TOOL_CALL = "tool_call"
-                TOOL = "tool_response"
-        ```
-        This is not ok! The names do not match. Will raise a TypeError.
-    """
-
-    SYSTEM = "SYSTEM"
-    HUMAN = "HUMAN"
-    AI = "AI"
-    TOOL_CALL = "TOOL_CALL"
-    TOOL_RESPONSE = "TOOL_RESPONSE"
+    def __init__(
+        self,
+        SYSTEM="SYSTEM",
+        HUMAN="HUMAN",
+        AI="AI",
+        TOOL_CALL="TOOL_CALL",
+        TOOL_RESPONSE="TOOL_RESPONSE",
+    ):
+        object.__setattr__(self, "SYSTEM", RoleMember("SYSTEM", SYSTEM))
+        object.__setattr__(self, "HUMAN", RoleMember("HUMAN", HUMAN))
+        object.__setattr__(self, "AI", RoleMember("AI", AI))
+        object.__setattr__(self, "TOOL_CALL", RoleMember("TOOL_CALL", TOOL_CALL))
+        object.__setattr__(
+            self, "TOOL_RESPONSE", RoleMember("TOOL_RESPONSE", TOOL_RESPONSE)
+        )
 
 
-class OpenAIChatRole(ChatRole):
-    """
-    A derived Enum from ChatRole. Maps the standard chat roles to OpenAI-specific roles.
-    The names are forced to match those in ChatRole for interoperability.
-    """
-
-    SYSTEM = "system"
-    HUMAN = "user"
-    AI = "assistant"
-    TOOL_CALL = "function_call"
-    TOOL_RESPONSE = "function"
+OpenAIChatRole = ChatRole(
+    SYSTEM="system",
+    HUMAN="user",
+    AI="assistant",
+    TOOL_CALL="function_call",
+    TOOL_RESPONSE="function",
+)

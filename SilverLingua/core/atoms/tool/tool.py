@@ -5,7 +5,7 @@ from .util import FunctionJSONSchema, generate_function_json
 
 
 class Tool:
-  """
+    """
     A wrapper class for functions that allows them to be both directly callable
     and serializable to JSON for use with an LLM.
 
@@ -31,20 +31,20 @@ class Tool:
         ```
     """
 
-  function: Callable
-  description: FunctionJSONSchema
-  name: str
+    function: Callable
+    description: FunctionJSONSchema
+    name: str
 
-  def __init__(self, function: Callable):
-    self.function = function
-    self.description = generate_function_json(function)
-    self.name = self.description['name']
+    def __init__(self, function: Callable):
+        self.function = function
+        self.description = generate_function_json(function)
+        self.name = self.description["name"]
 
-  def __call__(self, *args, **kwargs):
-    return self.function(*args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        return self.function(*args, **kwargs)
 
-  def to_json(self):
-    return json.dumps(self.description)
+    def to_json(self):
+        return json.dumps(self.description)
 
-  def __str__(self):
-    return self.to_json()
+    def __str__(self):
+        return self.to_json()

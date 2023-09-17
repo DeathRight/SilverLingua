@@ -33,62 +33,13 @@ def timeit(func):
     return wrapper
 
 
-class MatchingNameEnum:
-    """
-    A custom Enum that ensures that all derived Enums have the same names.
-    They can have different values.
+class ImmutableAttributeError(Exception):
+    def __init__(self, message, source=None):
+        if source is not None:
+            message += f" (Source: {repr(source)})"
+        super().__init__(message)
 
-    This allows grandchild classes to be used interchangeably with their
-    parent classes. (e.g., `ChatRole` and `OpenAIChatRole`)
 
-    Raises:
-        TypeError: If a subclass of a child does not have the same names as
-        the child.
-    """
-
-    @classmethod
-    def keys(cls):
-        return [key for key in cls.__dict__ if not key.startswith("_")]
-
-    @classmethod
-    def values(cls):
-        return [value for key, value in cls.__dict__.items() if not key.startswith("_")]
-
-    @classmethod
-    def items(cls):
-        return [
-            (key, value)
-            for key, value in cls.__dict__.items()
-            if not key.startswith("_")
-        ]
-
-    @classmethod
-    def __iter__(cls):
-        for key in cls:
-            yield key
-
-    @classmethod
-    def __init_subclass__(cls):
-        # Check if it's a subclass of a subclass of MatchingNameEnum (i.e., a grandchild)
-        if any(
-            issubclass(base, MatchingNameEnum) and base != MatchingNameEnum
-            for base in cls.__bases__
-        ):
-            base_cls = next(
-                base for base in cls.__bases__ if issubclass(base, MatchingNameEnum)
-            )
-            base_keys = set(base_cls.keys())
-            derived_keys = set(cls.keys())
-
-            extra_keys = derived_keys - base_keys
-            missing_keys = base_keys - derived_keys
-
-            if extra_keys or missing_keys:
-                error_message = []
-                if missing_keys:
-                    error_message.append(f"\nMissing keys: {', '.join(missing_keys)}")
-                if extra_keys:
-                    error_message.append(f"\nExtra keys: {', '.join(extra_keys)}")
-                raise TypeError(
-                    f"{cls.__name__} must have the same keys as {base_cls.__name__}. {' '.join(error_message)}"
-                )
+class ImmutableMixin:
+    def __setattr__(self, name, value):
+        raise ImmutableAttributeError("Instances are immutable")

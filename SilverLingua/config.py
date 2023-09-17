@@ -2,12 +2,11 @@ from typing import List, Optional
 
 from .core.atoms.roles import ChatRole, OpenAIChatRole, ReactRole
 from .core.atoms.tool import Tool
-from .util import MatchingNameEnum
 
 
 class Config:
-    chat_roles: List[MatchingNameEnum]
-    react_roles: List[MatchingNameEnum]
+    chat_roles: List[ChatRole]
+    react_roles: List[ReactRole]
     tools: List[Tool]
 
     def __init__(self):
