@@ -3,10 +3,13 @@ import os
 import openai
 import tiktoken
 
-from SilverLingua.core.model import Model
+from SilverLingua.core.atoms.model import Model, ModelType
+
+from ... import logger
 
 # List of OpenAI models and their maximum number of tokens.
 OpenAIModels = {
+    "text-embedding-ada-002": 8191,
     "text-davinci-003": 4097,
     "gpt-3.5-turbo": 4097,
     "gpt-3.5-turbo-16k": 16385,
@@ -15,7 +18,7 @@ OpenAIModels = {
 }
 
 
-class OpenAI(Model):
+class OpenAIModel(Model):
     """
     An OpenAI model.
     """
@@ -43,6 +46,13 @@ class OpenAI(Model):
         The name of the model version being used.
         """
         return self._name
+
+    @property
+    def type(self) -> ModelType:
+        """
+        The type of model being used.
+        """
+        return self._type
 
     @property
     def model(self) -> object:
@@ -106,10 +116,24 @@ class OpenAI(Model):
         Creates an OpenAI model.
 
         Args:
-            name (str, optional): The name of the model version being used. Defaults to "gpt-3.5-turbo".
-            streaming (bool, optional): Whether the model should be initialized as streaming. Defaults to False.
-            max_response (int, optional): The maximum number of tokens the model can return. Defaults to 256.
-            api_key (str, optional): The API key for the model. Defaults to the OPENAI_API_KEY environment variable.
+            name (str, optional): The name of the model version being used.
+            Defaults to "gpt-3.5-turbo".
+            streaming (bool, optional): Whether the model should be initialized as
+            streaming. Defaults to False.
+            max_response (int, optional): The maximum number of tokens the model can
+            return. Defaults to 256.
+            api_key (str, optional): The API key for the model. Defaults to the
+            OPENAI_API_KEY environment variable.
+            top_p (float, optional): The nucleus sampling probability. Defaults to 1.0.
+            temperature (float, optional): The temperature of the model.
+            Defaults to 1.0.
+            n (int, optional): The number of completions to generate. Defaults to 1.
+            stop (list, optional): The stop sequence(s) for the model. Defaults to None.
+            presence_penalty (float, optional): The presence penalty for the model.
+            Defaults to 0.0.
+            frequency_penalty (float, optional): The frequency penalty for the model.
+            Defaults to 0.0.
+            logit_bias (dict, optional): The logit bias for the model. Defaults to None.
         """
         self._api_key = api_key
         openai.api_key = self.api_key
@@ -121,9 +145,18 @@ class OpenAI(Model):
         if self._name == "text-davinci-003":
             self._can_stream = False
             self._model = openai.Completion
+            self._type = ModelType.TEXT
+            logger.warning(
+                "The text-davinci-003 will be deprecated 2024-01-04. (https://openai.com/blog/gpt-4-api-general-availability)"
+            )
+        elif self._name == "text-embedding-ada-002":
+            self._can_stream = False
+            self._model = openai.Embedding
+            self._type = ModelType.EMBEDDING
         else:
             self._can_stream = True
             self._model = openai.ChatCompletion
+            self._type = ModelType.CHAT
 
         self._streaming = self._can_stream and streaming
         self._max_response = max_response

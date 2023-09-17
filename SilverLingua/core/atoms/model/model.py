@@ -1,4 +1,12 @@
 from abc import ABC, abstractmethod
+from enum import Enum
+
+
+class ModelType(Enum):
+    CHAT = 0
+    TEXT = 1
+    EMBEDDING = 2
+    CODE = 3
 
 
 class Model(ABC):
@@ -19,6 +27,14 @@ class Model(ABC):
     def name(self) -> str:
         """
         The name of the model version being used.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def type(self) -> ModelType:
+        """
+        The type of model being used.
         """
         pass
 
@@ -73,23 +89,25 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def respond(self, prompt: str) -> str:
+    def respond(self, prompt: str, *args, **kwargs) -> object:
         """
         Calls the model with the given prompt and returns the response.
         """
         pass
 
     @abstractmethod
-    async def arespond(self, prompt: str) -> str:
+    async def arespond(self, prompt: str, *args, **kwargs) -> object:
         """
         Calls the model asynchronously with the given prompt and returns the response.
         """
         pass
 
     @abstractmethod
-    def stream(self, prompt: str) -> str:
+    def stream(self, prompt: str, *args, **kwargs) -> object:
         """
         Streams the model with the given prompt and returns the response.
+
+        If the model cannot be streamed, this will raise an exception.
         """
         pass
 
