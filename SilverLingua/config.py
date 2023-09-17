@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from .core.atoms.roles import ChatRole, OpenAIChatRole, ReactRole
+from .core.atoms.role import ChatRole, OpenAIChatRole, ReactRole
 from .core.atoms.tool import Tool
 
 

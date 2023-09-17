@@ -8,6 +8,14 @@ class Model(ABC):
 
     @property
     @abstractmethod
+    def api_key(self) -> str:
+        """
+        The API key for the model.
+        """
+        pass
+
+    @property
+    @abstractmethod
     def name(self) -> str:
         """
         The name of the model version being used.

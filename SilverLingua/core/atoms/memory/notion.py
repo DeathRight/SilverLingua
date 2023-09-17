@@ -3,7 +3,7 @@ from typing import Any
 from memory import Memory
 
 from ....constants import config
-from ..roles import ChatRole, ReactRole
+from ..role import ChatRole, ReactRole
 
 
 class Notion(Memory):
