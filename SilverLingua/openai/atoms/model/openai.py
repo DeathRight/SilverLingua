@@ -1,9 +1,12 @@
 import os
+from typing import List
 
 import openai
 import tiktoken
 
+from SilverLingua.core.atoms.memory import Notion
 from SilverLingua.core.atoms.model import Model, ModelType
+from SilverLingua.core.atoms.role import ChatRole, OpenAIChatRole
 
 from ... import logger
 
@@ -32,6 +35,10 @@ class OpenAIModel(Model):
     logit_bias: dict
 
     @property
+    def role(self) -> ChatRole:
+        return OpenAIChatRole
+
+    @property
     def api_key(self) -> str:
         """
         The API key for the model.
@@ -42,61 +49,45 @@ class OpenAIModel(Model):
 
     @property
     def name(self) -> str:
-        """
-        The name of the model version being used.
-        """
         return self._name
 
     @property
     def type(self) -> ModelType:
-        """
-        The type of model being used.
-        """
         return self._type
 
     @property
     def model(self) -> object:
-        """
-        The model itself.
-        """
         return self._model
 
     @property
     def can_stream(self) -> bool:
-        """
-        Whether the model can be streamed.
-        """
         return self._can_stream
 
     @property
     def streaming(self) -> bool:
-        """
-        Whether the model is initialized as streaming.
-        """
         return self._streaming
 
     @property
     def max_tokens(self) -> int:
-        """
-        The maximum number of tokens the model can handle.
-        """
         return OpenAIModels[self.name]
 
     @property
     def max_response(self) -> int:
-        """
-        The maximum number of tokens the model can return.
-
-        If 0, there is no limit other than the maximum number of tokens for the model.
-        """
         return self._max_response
 
     @property
     def tokenizer(self) -> tiktoken.Encoding:
-        """
-        The tokenizer for the model.
-        """
         return tiktoken.encoding_for_model(self.name)
+
+    def generate(self, messages: List[Notion]) -> str:
+        if messages is None:
+            raise ValueError("No messages provided.")
+
+        msgs = self._preprocess(self._trim(messages))
+
+        self._formatter(msgs)
+
+        # TODO: Implement generation
 
     def __init__(
         self,
@@ -171,5 +162,3 @@ class OpenAIModel(Model):
         self.presence_penalty = presence_penalty
         self.frequency_penalty = frequency_penalty
         self.logit_bias = logit_bias
-
-    # TODO: Implement generation

@@ -1,5 +1,9 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import List, Union
+
+from ..memory import Notion
+from ..role import ChatRole
 
 
 class ModelType(Enum):
@@ -13,6 +17,14 @@ class Model(ABC):
     """
     Abstract class for all Large Language Models.
     """
+
+    @property
+    @abstractmethod
+    def role(self) -> ChatRole:
+        """
+        The ChatRole object for the model.
+        """
+        pass
 
     @property
     @abstractmethod
@@ -89,23 +101,104 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def respond(self, prompt: str, *args, **kwargs) -> object:
+    def _trim(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
         """
-        Calls the model with the given prompt and returns the response.
+        Trims the List of `Notions` to fit the maximum number of tokens for the model.
+
+        This is a lifecycle method that is called by the `generate` method.
+
+        Lifecycle:
+            1. `generate` calls `_trim` with the given List of `Notions`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
+            4. `_formatter` formats the List of `Notions` into a prompt or object that
+            can be passed to the model.
+            5. `generate` calls the model with the prompt or object.
+            6. The model returns a response.
+            7. `generate` calls `_postprocess` with the response.
+            8. `_postprocess` returns a str response to be returned by `generate`.
+        """
+
+    @abstractmethod
+    def _preprocess(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
+        """
+        Preprocesses the List of `Notions` before passing it to the `_formatter`.
+
+        This is a lifecycle method that is called by the `generate` method.
+
+        Lifecycle:
+            1. `generate` calls `_trim` with the given List of `Notions`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
+            4. `_formatter` formats the List of `Notions` into a prompt or object that
+            can be passed to the model.
+            5. `generate` calls the model with the prompt or object.
+            6. The model returns a response.
+            7. `generate` calls `_postprocess` with the response.
+            8. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
 
     @abstractmethod
-    async def arespond(self, prompt: str, *args, **kwargs) -> object:
+    def _formatter(self, messages: List[Notion], *args, **kwargs) -> Union[str, object]:
         """
-        Calls the model asynchronously with the given prompt and returns the response.
+        Formats the List of `Notions` into a prompt or object
+        that can be passed to the model.
+
+        This is a lifecycle method that is called by the `generate` method.
+
+        Lifecycle:
+            1. `generate` calls `_trim` with the given List of `Notions`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
+            4. `_formatter` formats the List of `Notions` into a prompt or object that
+            can be passed to the model.
+            5. `generate` calls the model with the prompt or object.
+            6. The model returns a response.
+            7. `generate` calls `_postprocess` with the response.
+            8. `_postprocess` returns a str response to be returned by `generate`.
+        """
+        pass
+
+    @abstractmethod
+    def _postprocess(self, response: Union[object, str], *args, **kwargs) -> str:
+        """
+        Postprocesses the response from the model.
+
+        This is a lifecycle method that is called by the `generate` method.
+
+        Lifecycle:
+            1. `generate` calls `_trim` with the given List of `Notions`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
+            4. `_formatter` formats the List of `Notions` into a prompt or object that
+            can be passed to the model.
+            5. `generate` calls the model with the prompt or object.
+            6. The model returns a response.
+            7. `generate` calls `_postprocess` with the response.
+            8. `_postprocess` returns a str response to be returned by `generate`.
+        """
+        pass
+
+    @abstractmethod
+    def generate(self, messages: List[Notion], *args, **kwargs) -> str:
+        """
+        Calls the model with the given List of `Notions` and returns the response.
+        """
+        pass
+
+    @abstractmethod
+    async def agenerate(self, messages: List[Notion], *args, **kwargs) -> str:
+        """
+        Calls the model with the given List of `Notions` and returns the response.
         """
         pass
 
     @abstractmethod
     def stream(self, prompt: str, *args, **kwargs) -> object:
         """
-        Streams the model with the given prompt and returns the response.
+        Streams the model with the given prompt using the USER role and
+        returns the response.
 
         If the model cannot be streamed, this will raise an exception.
         """
