@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional, Union
 
 import openai
 import tiktoken
@@ -9,6 +9,7 @@ from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole, OpenAIChatRole
 
 from ... import logger
+from .util import ChatCompletionInputMessage
 
 # List of OpenAI models and their maximum number of tokens.
 OpenAIModels = {
@@ -26,6 +27,7 @@ class OpenAIModel(Model):
     An OpenAI model.
     """
 
+    # Completion parameters
     temperature: float
     top_p: float
     n: int
@@ -33,6 +35,12 @@ class OpenAIModel(Model):
     presence_penalty: float
     frequency_penalty: float
     logit_bias: dict
+
+    # Text completion specific parameters
+    suffix: Optional[str]
+    logprobs: Optional[int]
+    echo: bool
+    best_of: int
 
     @property
     def role(self) -> ChatRole:
@@ -79,15 +87,70 @@ class OpenAIModel(Model):
     def tokenizer(self) -> tiktoken.Encoding:
         return tiktoken.encoding_for_model(self.name)
 
-    def generate(self, messages: List[Notion]) -> str:
+    @property
+    def chat_args(self):
+        """
+        Boilerplate arguments for the OpenAI chat completion API to be unpacked.
+        """
+        return {
+            "model": self.name,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "n": self.n,
+            "stream": self.streaming,
+            "stop": self.stop,
+            "max_tokens": self.max_response,
+            "presence_penalty": self.presence_penalty,
+            "frequency_penalty": self.frequency_penalty,
+            "logit_bias": self.logit_bias,
+        }
+
+    @property
+    def text_args(self):
+        """
+        Boilerplate arguments for the OpenAI text completion API to be unpacked.
+        """
+        return {
+            "model": self.name,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "n": self.n,
+            "stop": self.stop,
+            "max_tokens": self.max_response,
+            "presence_penalty": self.presence_penalty,
+            "frequency_penalty": self.frequency_penalty,
+            "logit_bias": self.logit_bias,
+        }
+
+    def _call(
+        self,
+        input: Union[str, List[ChatCompletionInputMessage], List[str], List[List[int]]],
+        **kwargs,
+    ):
+        if input is None:
+            raise ValueError("No input provided.")
+
+        if self.type == ModelType.TEXT:
+            if input is not str:
+                raise ValueError("Input must be a string.")
+            return self.model.create(**self.text_args, prompt=input)
+        elif self.type == ModelType.CHAT:
+            if input is not list:
+                raise ValueError("Input must be a list of ChatCompletionInputMessage.")
+            return self.model.create(**self.chat_args, messages=input, **kwargs)
+        elif self.type == ModelType.EMBEDDING:
+            # TODO: Implement
+            pass
+
+    def generate(self, messages: List[Notion], **kwargs) -> str:
         if messages is None:
             raise ValueError("No messages provided.")
 
-        msgs = self._preprocess(self._trim(messages))
+        input = self._formatter(self._preprocess(self._trim(messages)))
 
-        self._formatter(msgs)
+        output = self._call(input, **kwargs)
 
-        # TODO: Implement generation
+        return self._postprocess(output)
 
     def __init__(
         self,
@@ -102,6 +165,10 @@ class OpenAIModel(Model):
         presence_penalty: float = 0.0,
         frequency_penalty: float = 0.0,
         logit_bias: dict = None,
+        suffix: Optional[str] = None,
+        logprobs: Optional[int] = None,
+        echo: bool = False,
+        best_of: int = 1,
     ):
         """
         Creates an OpenAI model.
@@ -125,6 +192,14 @@ class OpenAIModel(Model):
             frequency_penalty (float, optional): The frequency penalty for the model.
             Defaults to 0.0.
             logit_bias (dict, optional): The logit bias for the model. Defaults to None.
+            suffix (str, optional): The suffix for the model. Defaults to None.
+            logprobs (int, optional): The number of logprobs for the model.
+            Defaults to None.
+            echo (bool, optional): Echo back the prompt in addition to the completion.
+            Defaults to False.
+            best_of (int, optional): Generates `best_of` completions server-side and
+            returns the "best" (the one with the lowest log probability per token).
+            Defaults to 1.
         """
         self._api_key = api_key
         openai.api_key = self.api_key
@@ -162,3 +237,9 @@ class OpenAIModel(Model):
         self.presence_penalty = presence_penalty
         self.frequency_penalty = frequency_penalty
         self.logit_bias = logit_bias
+
+        # Text completion specific parameters
+        self.suffix = suffix
+        self.logprobs = logprobs
+        self.echo = echo
+        self.best_of = best_of

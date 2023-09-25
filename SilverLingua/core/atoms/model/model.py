@@ -109,14 +109,15 @@ class Model(ABC):
 
         Lifecycle:
             1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed
+            to `_preprocess`.
             3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
             4. `_formatter` formats the List of `Notions` into a prompt or object that
             can be passed to the model.
-            5. `generate` calls the model with the prompt or object.
-            6. The model returns a response.
-            7. `generate` calls `_postprocess` with the response.
-            8. `_postprocess` returns a str response to be returned by `generate`.
+            5. `_call` calls the model with the prompt or object
+            and returns the response.
+            6. `generate` calls `_postprocess` with the response.
+            7. `_postprocess` returns a str response to be returned by `generate`.
         """
 
     @abstractmethod
@@ -128,14 +129,15 @@ class Model(ABC):
 
         Lifecycle:
             1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed
+            to `_preprocess`.
             3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
             4. `_formatter` formats the List of `Notions` into a prompt or object that
             can be passed to the model.
-            5. `generate` calls the model with the prompt or object.
-            6. The model returns a response.
-            7. `generate` calls `_postprocess` with the response.
-            8. `_postprocess` returns a str response to be returned by `generate`.
+            5. `_call` calls the model with the prompt or object
+            and returns the response.
+            6. `generate` calls `_postprocess` with the response.
+            7. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
 
@@ -149,14 +151,15 @@ class Model(ABC):
 
         Lifecycle:
             1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed
+            to `_preprocess`.
             3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
             4. `_formatter` formats the List of `Notions` into a prompt or object that
             can be passed to the model.
-            5. `generate` calls the model with the prompt or object.
-            6. The model returns a response.
-            7. `generate` calls `_postprocess` with the response.
-            8. `_postprocess` returns a str response to be returned by `generate`.
+            5. `_call` calls the model with the prompt or object
+            and returns the response.
+            6. `generate` calls `_postprocess` with the response.
+            7. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
 
@@ -169,28 +172,85 @@ class Model(ABC):
 
         Lifecycle:
             1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed to `_preprocess`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed
+            to `_preprocess`.
             3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
             4. `_formatter` formats the List of `Notions` into a prompt or object that
             can be passed to the model.
-            5. `generate` calls the model with the prompt or object.
-            6. The model returns a response.
-            7. `generate` calls `_postprocess` with the response.
-            8. `_postprocess` returns a str response to be returned by `generate`.
+            5. `_call` calls the model with the prompt or object
+            and returns the response.
+            6. `generate` calls `_postprocess` with the response.
+            7. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
+
+    @abstractmethod
+    def _call(self, input: Union[str, object], *args, **kwargs) -> object:
+        """
+        Calls the model with the given input and returns the response.
+
+        Should behave exactly as `_acall` does, but synchronously.
+
+        This is a lifecycle method that is called by the `generate` method.
+
+        Lifecycle:
+            1. `generate` calls `_trim` with the given List of `Notions`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed
+            to `_preprocess`.
+            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
+            4. `_formatter` formats the List of `Notions` into a prompt or object that
+            can be passed to the model.
+            5. `_call` calls the model with the prompt or object
+            and returns the response.
+            6. `generate` calls `_postprocess` with the response.
+            7. `_postprocess` returns a str response to be returned by `generate`.
+        """
+        pass
+
+    @abstractmethod
+    async def _acall(self, input: Union[str, object], *args, **kwargs) -> object:
+        """
+        Calls the model with the given input and returns the response asynchronously.
+
+        Should behave exactly as `_call` does, but asynchronously.
+
+        This is a lifecycle method that is called by the `agenerate` method.
+
+        Lifecycle:
+            1. `agenerate` calls `_trim` with the given List of `Notions`.
+            2. `_trim` returns the trimmed List of `Notions` to be passed
+            to `_preprocess`.
+            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
+            4. `_formatter` formats the List of `Notions` into a prompt or object that
+            can be passed to the model.
+            5. `_acall` calls the model with the prompt or object
+            and returns the response.
+            6. `agenerate` calls `_postprocess` with the response.
+            7. `_postprocess` returns a str response to be returned by `agenerate`.
+        """
 
     @abstractmethod
     def generate(self, messages: List[Notion], *args, **kwargs) -> str:
         """
         Calls the model with the given List of `Notions` and returns the response.
+
+        Should behave exactly as `agenerate` does, but synchronously.
+
+        This is the primary method for generating responses from the model,
+        and is responsible for calling all of the lifecycle methods.
         """
         pass
 
     @abstractmethod
     async def agenerate(self, messages: List[Notion], *args, **kwargs) -> str:
         """
-        Calls the model with the given List of `Notions` and returns the response.
+        Calls the model with the given List of `Notions` and returns the response
+        asynchronously.
+
+        Should behave exactly as `generate` does, but asynchronously.
+
+        This is the primary method for generating async responses from the model,
+        and is responsible for calling all of the lifecycle methods.
         """
         pass
 
