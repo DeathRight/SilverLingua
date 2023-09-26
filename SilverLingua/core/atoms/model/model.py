@@ -16,6 +16,37 @@ class ModelType(Enum):
 class Model(ABC):
     """
     Abstract class for all Large Language Models.
+
+    This class outlines a standardized lifecycle for interacting with LLMs,
+    aimed at ensuring a consistent process for message trimming, pre-processing,
+    preparing requests for the model, invoking the model, standardizing the response,
+    and post-processing. The lifecycle is as follows:
+
+    Lifecycle:
+    1. Pre-processing (_preprocess): Performs any necessary transformations or
+        adjustments to the messages prior to trimming or preparing them for model input.
+        (Optional)
+
+    2. Trimming (_trim): Adjusts the input messages to fit the model's
+        maximum token limit.
+
+    3. Preparing Request (_format_request): Converts the pre-processed and
+        trimmed messages into a format suitable for model input.
+
+    4. Model Invocation (_call or _acall): Feeds the prepared input to the LLM and
+        retrieves the raw model output. There should be both synchronous and
+        asynchronous versions available.
+
+    5. Standardizing Response (_standardize_response): Transforms the raw model
+        output into a consistent response format suitable for further processing or
+        delivery.
+
+    6. Post-processing (_postprocess): Performs any final transformations or
+        adjustments to the standardized responses, making them ready for delivery.
+        (Optional)
+
+    Subclasses should implement each of the non-optional lifecycle steps in accordance
+    with the specific requirements and behaviors of the target LLM.
     """
 
     @property
@@ -101,140 +132,83 @@ class Model(ABC):
         pass
 
     @abstractmethod
+    def _preprocess(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
+        """
+        Preprocesses the List of `Notions`, applying any effects necessary
+        before being prepped for input into an API.
+
+        This is a lifecycle method that is called by the `generate` method.
+        """
+        pass
+
+    @abstractmethod
     def _trim(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
         """
         Trims the List of `Notions` to fit the maximum number of tokens for the model.
 
         This is a lifecycle method that is called by the `generate` method.
-
-        Lifecycle:
-            1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed
-            to `_preprocess`.
-            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
-            4. `_formatter` formats the List of `Notions` into a prompt or object that
-            can be passed to the model.
-            5. `_call` calls the model with the prompt or object
-            and returns the response.
-            6. `generate` calls `_postprocess` with the response.
-            7. `_postprocess` returns a str response to be returned by `generate`.
-        """
-
-    @abstractmethod
-    def _preprocess(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
-        """
-        Preprocesses the List of `Notions` before passing it to the `_formatter`.
-
-        This is a lifecycle method that is called by the `generate` method.
-
-        Lifecycle:
-            1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed
-            to `_preprocess`.
-            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
-            4. `_formatter` formats the List of `Notions` into a prompt or object that
-            can be passed to the model.
-            5. `_call` calls the model with the prompt or object
-            and returns the response.
-            6. `generate` calls `_postprocess` with the response.
-            7. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
 
     @abstractmethod
-    def _formatter(self, messages: List[Notion], *args, **kwargs) -> Union[str, object]:
+    def _format_request(
+        self, messages: List[Notion], *args, **kwargs
+    ) -> Union[str, object]:
         """
-        Formats the List of `Notions` into a prompt or object
-        that can be passed to the model.
+        Formats the List of `Notions` into a format suitable for model input.
 
         This is a lifecycle method that is called by the `generate` method.
-
-        Lifecycle:
-            1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed
-            to `_preprocess`.
-            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
-            4. `_formatter` formats the List of `Notions` into a prompt or object that
-            can be passed to the model.
-            5. `_call` calls the model with the prompt or object
-            and returns the response.
-            6. `generate` calls `_postprocess` with the response.
-            7. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
 
     @abstractmethod
-    def _postprocess(self, response: Union[object, str], *args, **kwargs) -> str:
+    def _standardize_response(
+        self, response: Union[object, str], *args, **kwargs
+    ) -> List[str]:
         """
-        Postprocesses the response from the model.
+        Standardizes the raw response from the model into a List of strings.
 
         This is a lifecycle method that is called by the `generate` method.
+        """
+        pass
 
-        Lifecycle:
-            1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed
-            to `_preprocess`.
-            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
-            4. `_formatter` formats the List of `Notions` into a prompt or object that
-            can be passed to the model.
-            5. `_call` calls the model with the prompt or object
-            and returns the response.
-            6. `generate` calls `_postprocess` with the response.
-            7. `_postprocess` returns a str response to be returned by `generate`.
+    @abstractmethod
+    def _postprocess(self, response: Union[object, str], *args, **kwargs) -> List[str]:
+        """
+        Postprocesses the response from the model, applying any final effects
+        before being returned.
+
+        This is a lifecycle method that is called by the `generate` method.
         """
         pass
 
     @abstractmethod
     def _call(self, input: Union[str, object], *args, **kwargs) -> object:
         """
-        Calls the model with the given input and returns the response.
+        Calls the model with the given input and returns the raw response.
 
         Should behave exactly as `_acall` does, but synchronously.
 
         This is a lifecycle method that is called by the `generate` method.
-
-        Lifecycle:
-            1. `generate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed
-            to `_preprocess`.
-            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
-            4. `_formatter` formats the List of `Notions` into a prompt or object that
-            can be passed to the model.
-            5. `_call` calls the model with the prompt or object
-            and returns the response.
-            6. `generate` calls `_postprocess` with the response.
-            7. `_postprocess` returns a str response to be returned by `generate`.
         """
         pass
 
     @abstractmethod
     async def _acall(self, input: Union[str, object], *args, **kwargs) -> object:
         """
-        Calls the model with the given input and returns the response asynchronously.
+        Calls the model with the given input and returns the
+        raw response asynchronously.
 
         Should behave exactly as `_call` does, but asynchronously.
 
         This is a lifecycle method that is called by the `agenerate` method.
-
-        Lifecycle:
-            1. `agenerate` calls `_trim` with the given List of `Notions`.
-            2. `_trim` returns the trimmed List of `Notions` to be passed
-            to `_preprocess`.
-            3. `_preprocess` returns the List of `Notions` to be passed to `_formatter`.
-            4. `_formatter` formats the List of `Notions` into a prompt or object that
-            can be passed to the model.
-            5. `_acall` calls the model with the prompt or object
-            and returns the response.
-            6. `agenerate` calls `_postprocess` with the response.
-            7. `_postprocess` returns a str response to be returned by `agenerate`.
         """
+        pass
 
     @abstractmethod
-    def generate(self, messages: List[Notion], *args, **kwargs) -> str:
+    def generate(self, messages: List[Notion], *args, **kwargs) -> List[str]:
         """
         Calls the model with the given List of `Notions` and returns the response.
-
-        Should behave exactly as `agenerate` does, but synchronously.
 
         This is the primary method for generating responses from the model,
         and is responsible for calling all of the lifecycle methods.
@@ -242,12 +216,10 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    async def agenerate(self, messages: List[Notion], *args, **kwargs) -> str:
+    async def agenerate(self, messages: List[Notion], *args, **kwargs) -> List[str]:
         """
         Calls the model with the given List of `Notions` and returns the response
         asynchronously.
-
-        Should behave exactly as `generate` does, but asynchronously.
 
         This is the primary method for generating async responses from the model,
         and is responsible for calling all of the lifecycle methods.
@@ -265,7 +237,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def __init__(self, streaming: bool = False, max_response: int = 0, **kwargs):
+    def __init__(self, max_response: int = 0, **kwargs):
         """
         Initializes the model.
         """
