@@ -13,12 +13,16 @@ class Notion(Memory):
     The role is usually a `ChatRole` or a `ReactRole`.
     (See `atoms/roles`)
 
-
+    Attributes:
+        role: The role of the notion.
+        content: The content of the memory.
+        persistent: Whether the notion should be stored in long-term memory.
     """
 
     role: str
+    persisent: bool = False
 
-    def __init__(self, content: str, role: Any) -> None:
+    def __init__(self, content: str, role: Any, persistent: bool = False) -> None:
         super().__init__(content)
 
         if hasattr(role, "name") and hasattr(role, "value"):
@@ -28,16 +32,22 @@ class Notion(Memory):
         else:
             raise TypeError(f"Expected an enum member or a string, got {type(role)}")
 
+        self.persistent = persistent
+
     def __str__(self) -> str:
         return f"{self.role}: {self.content}"
 
     def __repr__(self) -> str:
-        return f"Notion({self.content}, {self.role})"
+        return f"Notion({self.content}, {self.role}, {self.persistent})"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Notion):
             return NotImplemented
-        return self.content == other.content and self.role == other.role
+        return (
+            self.content == other.content
+            and self.role == other.role
+            and self.persistent == other.persistent
+        )
 
     @property
     def chat_role(self) -> ChatRole:

@@ -56,6 +56,13 @@ class OpenAIModel(Model):
         return self._api_key
 
     @property
+    def moderation(self) -> openai.Moderation:
+        """
+        The moderation object used to check if text violates OpenAI's content policy.
+        """
+        return openai.Moderation
+
+    @property
     def name(self) -> str:
         return self._name
 
@@ -77,7 +84,11 @@ class OpenAIModel(Model):
 
     @property
     def max_tokens(self) -> int:
-        return OpenAIModels[self.name]
+        # Subtract the max response from the maximum number of tokens
+        # to leave room for the response.
+        return OpenAIModels[self.name] - (
+            self.max_response == 0 and 124 or self.max_response
+        )
 
     @property
     def max_response(self) -> int:
@@ -121,6 +132,85 @@ class OpenAIModel(Model):
             "frequency_penalty": self.frequency_penalty,
             "logit_bias": self.logit_bias,
         }
+
+    def _preprocess(self, messages: List[Notion]):
+        return messages
+
+    def _trim(self, messages: List[Notion]):
+        return_messages = messages.copy()
+        available_tokens = self.max_tokens
+
+        system_msg = None
+        system_msg_index = None
+
+        user_msg_count = 0
+        last_user_index = 0
+
+        # Check if the number of messages is greater than the maximum number of tokens.
+        if len(return_messages) > self.max_tokens:
+            # Trim the messages to the maximum number of tokens.
+            return_messages = return_messages[: self.max_tokens]
+
+        # Tokenize the messages.
+        rm = return_messages.copy()
+        tokenized_msgs = []
+        i = -1
+        for msg in return_messages:
+            i += 1
+            t_msg = self.tokenizer.encode(msg.content)
+
+            # If the message is a system message, save it for later,
+            # remove it from the list of messages, and subtract its length
+            # from the available tokens. This is because system messages
+            # should be protected from being trimmed.
+            if msg.role == ChatRole.SYSTEM:
+                system_msg = msg
+                system_msg_index = i
+                available_tokens -= len(t_msg)
+                rm.pop(i)
+                i -= 1  # To keep the index in sync
+                continue
+            elif msg.role == ChatRole.USER:
+                user_msg_count += 1
+                last_user_index = i
+
+            available_tokens -= len(t_msg)
+            tokenized_msgs.append(t_msg)
+        return_messages = rm
+
+        # If there is only one message
+        if len(tokenized_msgs) == 1:
+            # If available tokens is less than 0, trim the message
+            # to the available tokens.
+            if available_tokens < 0:
+                tokenized_msgs[0] = tokenized_msgs[0][:available_tokens]
+                return_messages[0].content = self.tokenizer.decode(tokenized_msgs[0])
+
+            return return_messages
+        elif len(tokenized_msgs) > 1 and available_tokens < 0:
+            if user_msg_count == 1:
+                # If there is only one user message, trim the message
+                # to the available tokens.
+                tokenized_msgs[last_user_index] = tokenized_msgs[last_user_index][
+                    :available_tokens
+                ]
+                return_messages[last_user_index].content = self.tokenizer.decode(
+                    tokenized_msgs[last_user_index]
+                )
+            # If available tokens is less than 0, trim entire messages
+            # starting from the top until available tokens is 0 or greater.
+            for i in range(len(tokenized_msgs)):
+                if available_tokens >= 0:
+                    break
+
+                available_tokens += len(tokenized_msgs[i])
+                tokenized_msgs.pop(i)
+                return_messages.pop(i)
+
+        # Place system message back into the list of messages.
+        if system_msg is not None:
+            return_messages.insert(system_msg_index, system_msg)
+        return return_messages
 
     def _call(
         self,
