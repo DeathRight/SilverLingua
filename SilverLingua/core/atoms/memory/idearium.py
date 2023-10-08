@@ -1,6 +1,3 @@
-# A collection of Notions (should be possible to set up for automatic trimming of
-# notions or their content, with awareness of roles)
-
 from typing import Callable, Iterator, List, TypedDict
 
 from .notion import Notion
