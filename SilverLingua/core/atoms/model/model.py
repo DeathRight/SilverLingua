@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Union
 
-from ..memory import Notion
+from ..memory import Idearium, Notion
 from ..role import ChatRole
 
 
@@ -206,9 +206,13 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def generate(self, messages: List[Notion], *args, **kwargs) -> List[str]:
+    def generate(
+        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+    ) -> List[str]:
         """
-        Calls the model with the given List of `Notions` and returns the response.
+        Calls the model with the given messages and returns the response.
+
+        Messages can be either an Idearium or a List of Notions.
 
         This is the primary method for generating responses from the model,
         and is responsible for calling all of the lifecycle methods.
@@ -216,10 +220,14 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    async def agenerate(self, messages: List[Notion], *args, **kwargs) -> List[str]:
+    async def agenerate(
+        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+    ) -> List[str]:
         """
-        Calls the model with the given List of `Notions` and returns the response
+        Calls the model with the given messages and returns the response
         asynchronously.
+
+        Messages can be either an Idearium or a List of Notions.
 
         This is the primary method for generating async responses from the model,
         and is responsible for calling all of the lifecycle methods.
