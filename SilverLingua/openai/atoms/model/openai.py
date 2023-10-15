@@ -4,12 +4,12 @@ from typing import List, Optional, Union
 import openai
 import tiktoken
 
-from SilverLingua.core.atoms.memory import Notion
+from SilverLingua.core.atoms.memory import Notion, Idearium
 from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole, OpenAIChatRole
 
 from ... import logger
-from .util import ChatCompletionInputMessage
+from .util import ChatCompletionInputMessage, ChatCompletionOutput
 
 # List of OpenAI models and their maximum number of tokens.
 OpenAIModels = {
@@ -136,81 +136,42 @@ class OpenAIModel(Model):
     def _preprocess(self, messages: List[Notion]):
         return messages
 
-    def _trim(self, messages: List[Notion]):
-        return_messages = messages.copy()
-        available_tokens = self.max_tokens
-
-        system_msg = None
-        system_msg_index = None
-
-        user_msg_count = 0
-        last_user_index = 0
-
-        # Check if the number of messages is greater than the maximum number of tokens.
-        if len(return_messages) > self.max_tokens:
-            # Trim the messages to the maximum number of tokens.
-            return_messages = return_messages[: self.max_tokens]
-
-        # Tokenize the messages.
-        rm = return_messages.copy()
-        tokenized_msgs = []
-        i = -1
-        for msg in return_messages:
-            i += 1
-            t_msg = self.tokenizer.encode(msg.content)
-
-            # If the message is a system message, save it for later,
-            # remove it from the list of messages, and subtract its length
-            # from the available tokens. This is because system messages
-            # should be protected from being trimmed.
-            if msg.role == ChatRole.SYSTEM:
-                system_msg = msg
-                system_msg_index = i
-                available_tokens -= len(t_msg)
-                rm.pop(i)
-                i -= 1  # To keep the index in sync
-                continue
-            elif msg.role == ChatRole.USER:
-                user_msg_count += 1
-                last_user_index = i
-
-            available_tokens -= len(t_msg)
-            tokenized_msgs.append(t_msg)
-        return_messages = rm
-
-        # If there is only one message
-        if len(tokenized_msgs) == 1:
-            # If available tokens is less than 0, trim the message
-            # to the available tokens.
-            if available_tokens < 0:
-                tokenized_msgs[0] = tokenized_msgs[0][:available_tokens]
-                return_messages[0].content = self.tokenizer.decode(tokenized_msgs[0])
-
-            return return_messages
-        elif len(tokenized_msgs) > 1 and available_tokens < 0:
-            if user_msg_count == 1:
-                # If there is only one user message, trim the message
-                # to the available tokens.
-                tokenized_msgs[last_user_index] = tokenized_msgs[last_user_index][
-                    :available_tokens
-                ]
-                return_messages[last_user_index].content = self.tokenizer.decode(
-                    tokenized_msgs[last_user_index]
-                )
-            # If available tokens is less than 0, trim entire messages
-            # starting from the top until available tokens is 0 or greater.
-            for i in range(len(tokenized_msgs)):
-                if available_tokens >= 0:
-                    break
-
-                available_tokens += len(tokenized_msgs[i])
-                tokenized_msgs.pop(i)
-                return_messages.pop(i)
-
-        # Place system message back into the list of messages.
-        if system_msg is not None:
-            return_messages.insert(system_msg_index, system_msg)
-        return return_messages
+    def _format_request(self, messages: List[Notion], *args, **kwargs) -> List[ChatCompletionInputMessage]:
+        input
+        if self.type == ModelType.CHAT:
+            input: List[ChatCompletionInputMessage] = []
+            for message in messages:
+                input.append(
+                   ChatCompletionInputMessage(
+                      str(message.chat_role),
+                      message.content
+                  )
+             )
+        elif self.type == ModelType.TEXT:
+            input: str = messages[0].content
+        elif self.type == ModelType.EMBEDDING:
+            raise NotImplementedError("Embedding models are not yet supported.")
+        elif self.type == ModelType.CODE:
+            raise NotImplementedError("Code models are not yet supported.")
+        return input
+    
+    def _standardize_response(self, response: List[str], *args, **kwargs) -> List[str]:
+        output: List[str] = []
+        if self.type == ModelType.CHAT:
+            response: ChatCompletionOutput = response
+            for choice in response.choices:
+                output.append(choice.message.content)
+        elif self.type == ModelType.TEXT:
+            response: str = response
+            output.append(response)
+        elif self.type == ModelType.EMBEDDING:
+            raise NotImplementedError("Embedding models are not yet supported.")
+        elif self.type == ModelType.CODE:
+            raise NotImplementedError("Code models are not yet supported.")
+        return output
+    
+    def _postprocess(self, response: Union[object, str], *args, **kwargs) -> List[str]:
+        return response
 
     def _call(
         self,
@@ -229,16 +190,22 @@ class OpenAIModel(Model):
                 raise ValueError("Input must be a list of ChatCompletionInputMessage.")
             return self.model.create(**self.chat_args, messages=input, **kwargs)
         elif self.type == ModelType.EMBEDDING:
-            # TODO: Implement
-            pass
+            raise NotImplementedError("Embedding models are not yet supported.")
+        elif self.type == ModelType.CODE:
+            raise NotImplementedError("Code models are not yet supported.")
 
-    def generate(self, messages: List[Notion], **kwargs) -> str:
+    def generate(self, messages: Union[Idearium, List[Notion]], **kwargs) -> str:
         if messages is None:
             raise ValueError("No messages provided.")
 
-        input = self._formatter(self._preprocess(self._trim(messages)))
+        # If messages is not an Idearium, convert it to one
+        # so we can take advantage of its automatic trimming.
+        if not isinstance(messages, Idearium):
+            messages = Idearium(self.tokenizer, self.max_tokens, messages)
 
-        output = self._call(input, **kwargs)
+        input = self._format_request(self._preprocess(messages))
+
+        output = self._standardize_response(self._call(input, **kwargs))
 
         return self._postprocess(output)
 

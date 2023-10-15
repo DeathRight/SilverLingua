@@ -27,21 +27,18 @@ class Model(ABC):
         adjustments to the messages prior to trimming or preparing them for model input.
         (Optional)
 
-    2. Trimming (_trim): Adjusts the input messages to fit the model's
-        maximum token limit.
+    2. Preparing Request (_format_request): Converts the pre-processed messages
+        into a format suitable for model input.
 
-    3. Preparing Request (_format_request): Converts the pre-processed and
-        trimmed messages into a format suitable for model input.
-
-    4. Model Invocation (_call or _acall): Feeds the prepared input to the LLM and
+    3. Model Invocation (_call or _acall): Feeds the prepared input to the LLM and
         retrieves the raw model output. There should be both synchronous and
         asynchronous versions available.
 
-    5. Standardizing Response (_standardize_response): Transforms the raw model
+    4. Standardizing Response (_standardize_response): Transforms the raw model
         output into a consistent response format suitable for further processing or
         delivery.
 
-    6. Post-processing (_postprocess): Performs any final transformations or
+    5. Post-processing (_postprocess): Performs any final transformations or
         adjustments to the standardized responses, making them ready for delivery.
         (Optional)
 
@@ -142,15 +139,6 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def _trim(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
-        """
-        Trims the List of `Notions` to fit the maximum number of tokens for the model.
-
-        This is a lifecycle method that is called by the `generate` method.
-        """
-        pass
-
-    @abstractmethod
     def _format_request(
         self, messages: List[Notion], *args, **kwargs
     ) -> Union[str, object]:
@@ -173,7 +161,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def _postprocess(self, response: Union[object, str], *args, **kwargs) -> List[str]:
+    def _postprocess(self, response: List[str], *args, **kwargs) -> List[str]:
         """
         Postprocesses the response from the model, applying any final effects
         before being returned.
