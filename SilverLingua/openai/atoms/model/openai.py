@@ -4,22 +4,16 @@ from typing import List, Optional, Union
 import openai
 import tiktoken
 
-from SilverLingua.core.atoms.memory import Notion, Idearium
+from SilverLingua.core.atoms.memory import Idearium, Notion
 from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole, OpenAIChatRole
 
 from ... import logger
-from .util import ChatCompletionInputMessage, ChatCompletionOutput
-
-# List of OpenAI models and their maximum number of tokens.
-OpenAIModels = {
-    "text-embedding-ada-002": 8191,
-    "text-davinci-003": 4097,
-    "gpt-3.5-turbo": 4097,
-    "gpt-3.5-turbo-16k": 16385,
-    "gpt-4": 8192,
-    "gpt-4-32k": 32768,
-}
+from .util import (
+    ChatCompletionInputMessage,
+    ChatCompletionOutput,
+    OpenAIModels,
+)
 
 
 class OpenAIModel(Model):
@@ -99,7 +93,7 @@ class OpenAIModel(Model):
         return tiktoken.encoding_for_model(self.name)
 
     @property
-    def chat_args(self):
+    def __chat_args(self):
         """
         Boilerplate arguments for the OpenAI chat completion API to be unpacked.
         """
@@ -117,7 +111,7 @@ class OpenAIModel(Model):
         }
 
     @property
-    def text_args(self):
+    def __text_args(self):
         """
         Boilerplate arguments for the OpenAI text completion API to be unpacked.
         """
@@ -136,17 +130,16 @@ class OpenAIModel(Model):
     def _preprocess(self, messages: List[Notion]):
         return messages
 
-    def _format_request(self, messages: List[Notion], *args, **kwargs) -> List[ChatCompletionInputMessage]:
-        input
+    def _format_request(
+        self, messages: List[Notion]
+    ) -> Union[str, List[ChatCompletionInputMessage]]:
+        input = None
         if self.type == ModelType.CHAT:
             input: List[ChatCompletionInputMessage] = []
             for message in messages:
                 input.append(
-                   ChatCompletionInputMessage(
-                      str(message.chat_role),
-                      message.content
-                  )
-             )
+                    ChatCompletionInputMessage(str(message.chat_role), message.content)
+                )
         elif self.type == ModelType.TEXT:
             input: str = messages[0].content
         elif self.type == ModelType.EMBEDDING:
@@ -154,8 +147,8 @@ class OpenAIModel(Model):
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
         return input
-    
-    def _standardize_response(self, response: List[str], *args, **kwargs) -> List[str]:
+
+    def _standardize_response(self, response: List[str]) -> List[str]:
         output: List[str] = []
         if self.type == ModelType.CHAT:
             response: ChatCompletionOutput = response
@@ -169,8 +162,8 @@ class OpenAIModel(Model):
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
         return output
-    
-    def _postprocess(self, response: Union[object, str], *args, **kwargs) -> List[str]:
+
+    def _postprocess(self, response: List[str]) -> List[str]:
         return response
 
     def _call(
@@ -184,11 +177,11 @@ class OpenAIModel(Model):
         if self.type == ModelType.TEXT:
             if input is not str:
                 raise ValueError("Input must be a string.")
-            return self.model.create(**self.text_args, prompt=input)
+            return self.model.create(**self.__text_args, prompt=input)
         elif self.type == ModelType.CHAT:
             if input is not list:
                 raise ValueError("Input must be a list of ChatCompletionInputMessage.")
-            return self.model.create(**self.chat_args, messages=input, **kwargs)
+            return self.model.create(**self.__chat_args, messages=input, **kwargs)
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
