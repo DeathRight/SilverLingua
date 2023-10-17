@@ -1,11 +1,12 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from ...core.atoms.tool import Tool
+from SilverLingua.core.atoms.tool import Tool
+
 from ..atoms import OpenAIChatModels, OpenAIModel
 
 
 class OpenAIChatModel(OpenAIModel):
-    tools: List[Tool]
+    tools: Dict[str, Tool] = {}
 
     def __init__(
         self, name: str = "gpt-3.5-turbo", *args, tools: Optional[List[Tool]], **kwargs
@@ -47,4 +48,4 @@ class OpenAIChatModel(OpenAIModel):
         super().__init__(*args, **kwargs)
         self.tools = tools
 
-    # TODO: Override _format_request to include tools as OpenAI functions
+    # TODO: Finish implementing this. zOz

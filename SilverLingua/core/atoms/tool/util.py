@@ -1,17 +1,66 @@
 import inspect
+import json
 import re
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Type, TypedDict, Union
 
 
-class FunctionCall(TypedDict):
+@dataclass(frozen=True)
+class FunctionCall:
     """
-    The JSON output of a function call from the OpenAI ChatCompletion API.
+    The JSON output of a function call.
 
     When the AI attempts to call a function, this is the schema.
+
+    [Note: The str representation is a JSON string.]
     """
 
     name: str
-    arguments: dict[str, Any]
+    arguments: Dict[str, Any]
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "FunctionCall":
+        data = json.loads(json_str)
+        return cls(name=data["name"], arguments=data["arguments"])
+
+    def to_json(self) -> str:
+        return json.dumps(self.__dict__)
+
+    def __repr__(self) -> str:
+        return self.to_json()
+
+    def __str__(self) -> str:
+        return self.to_json()
+
+
+@dataclass(frozen=True)
+class FunctionResponse:
+    """
+    The JSON output of a function response.
+
+    When the system responds to a function call by the AI, this is the schema.
+
+    Content must be a string in JSON format.
+
+    [Note: The str representation is a JSON string.]
+    """
+
+    name: str
+    content: str
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "FunctionResponse":
+        data = json.loads(json_str)
+        return cls(name=data["name"], response=data["content"])
+
+    def to_json(self) -> str:
+        return json.dumps(self.__dict__)
+
+    def __repr__(self) -> str:
+        return self.to_json()
+
+    def __str__(self) -> str:
+        return self.to_json()
 
 
 class Parameter(TypedDict, total=False):
@@ -53,7 +102,9 @@ class FunctionJSONSchema(TypedDict):
     ```json
     {
         "name": "roll_dice",
-        "description": "Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage. Returns `{result: int, rolls: int[]}`",
+        "description": "Rolls a number of dice with a given number of sides, optionally
+            with a modifier and/or advantage/disadvantage.
+            Returns `{result: int, rolls: int[]}`",
         "parameters": {
             "type": "object",
             "properties": {
@@ -182,7 +233,8 @@ def generate_function_json(func: Callable[..., Any]) -> FunctionJSONSchema:
                   advantage: bool = False,
                   disadvantage: bool = False):
         \"""
-        Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage.
+        Rolls a number of dice with a given number of sides, optionally with a modifier
+        and/or advantage/disadvantage.
         Returns `{result: int, rolls: int[]}`
 
         Args:
@@ -205,7 +257,9 @@ def generate_function_json(func: Callable[..., Any]) -> FunctionJSONSchema:
     ```json
     {
         "name": "roll_dice",
-        "description": "Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage. Returns `{result: int, rolls: int[]}`",
+        "description": "Rolls a number of dice with a given number of sides, optionally
+            with a modifier and/or advantage/disadvantage.
+            Returns `{result: int, rolls: int[]}`",
         "parameters": {
             "type": "object",
             "properties": {

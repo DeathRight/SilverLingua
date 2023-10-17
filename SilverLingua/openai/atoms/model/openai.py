@@ -7,6 +7,7 @@ import tiktoken
 from SilverLingua.core.atoms.memory import Idearium, Notion
 from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole, OpenAIChatRole
+from SilverLingua.core.atoms.tool import FunctionCall, FunctionResponse
 
 from ... import logger
 from .util import (
@@ -136,10 +137,29 @@ class OpenAIModel(Model):
         input = None
         if self.type == ModelType.CHAT:
             input: List[ChatCompletionInputMessage] = []
-            for message in messages:
-                input.append(
-                    ChatCompletionInputMessage(str(message.chat_role), message.content)
-                )
+            for msg in messages:
+                if msg.chat_role == ChatRole.TOOL_CALL:
+                    input.append(
+                        ChatCompletionInputMessage(
+                            role=msg.chat_role,
+                            function_call=FunctionCall.from_json(msg.content),
+                        )
+                    )
+                elif msg.chat_role == ChatRole.TOOL_RESPONSE:
+                    func_response = FunctionResponse.from_json(msg.content)
+                    input.append(
+                        ChatCompletionInputMessage(
+                            role=msg.chat_role,
+                            name=func_response.name,
+                            content=func_response.content,
+                        )
+                    )
+                else:
+                    input.append(
+                        ChatCompletionInputMessage(
+                            role=msg.chat_role, content=msg.content
+                        )
+                    )
         elif self.type == ModelType.TEXT:
             input: str = messages[0].content
         elif self.type == ModelType.EMBEDDING:
@@ -148,22 +168,33 @@ class OpenAIModel(Model):
             raise NotImplementedError("Code models are not yet supported.")
         return input
 
-    def _standardize_response(self, response: List[str]) -> List[str]:
-        output: List[str] = []
+    def _standardize_response(
+        self, response: Union[str, ChatCompletionOutput]
+    ) -> List[Notion]:
+        output: List[Notion] = []
         if self.type == ModelType.CHAT:
-            response: ChatCompletionOutput = response
-            for choice in response.choices:
-                output.append(choice.message.content)
+            r: ChatCompletionOutput = response
+            for choice in r.choices:
+                msg = choice.message
+                if hasattr(msg, "function_call") and msg.function_call is not None:
+                    output.append(
+                        Notion(
+                            FunctionCall.to_json(msg.function_call),
+                            ChatRole.TOOL_CALL,
+                        )
+                    )
+                else:
+                    output.append(Notion(msg.content, ChatRole.AI))
         elif self.type == ModelType.TEXT:
             response: str = response
-            output.append(response)
+            output.append(Notion(r, ChatRole.AI))
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
         return output
 
-    def _postprocess(self, response: List[str]) -> List[str]:
+    def _postprocess(self, response: List[Notion]) -> List[Notion]:
         return response
 
     def _call(

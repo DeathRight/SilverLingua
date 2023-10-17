@@ -152,16 +152,16 @@ class Model(ABC):
     @abstractmethod
     def _standardize_response(
         self, response: Union[object, str], *args, **kwargs
-    ) -> List[str]:
+    ) -> List[Notion]:
         """
-        Standardizes the raw response from the model into a List of strings.
+        Standardizes the raw response from the model into a List of Notions.
 
         This is a lifecycle method that is called by the `generate` method.
         """
         pass
 
     @abstractmethod
-    def _postprocess(self, response: List[str], *args, **kwargs) -> List[str]:
+    def _postprocess(self, response: List[Notion], *args, **kwargs) -> List[Notion]:
         """
         Postprocesses the response from the model, applying any final effects
         before being returned.
