@@ -1,23 +1,18 @@
-from typing import Dict, List, Optional
+from typing import List, Union
 
-from SilverLingua.core.atoms.tool import Tool
+from SilverLingua.core.atoms.memory import Idearium, Notion
 
 from ..atoms import OpenAIChatModels, OpenAIModel
 
 
 class OpenAIChatModel(OpenAIModel):
-    tools: Dict[str, Tool] = {}
-
-    def __init__(
-        self, name: str = "gpt-3.5-turbo", *args, tools: Optional[List[Tool]], **kwargs
-    ):
+    def __init__(self, name: str = "gpt-3.5-turbo", *args, **kwargs):
         """
-        Creates an OpenAI Chat model, optionally with a set of tools it can use.
+        Creates an OpenAI Chat model.
 
         Args:
             name (str, optional): The name of the model version being used.
             Defaults to "gpt-3.5-turbo".
-            tools (List[Tool], optional): The tools the model can use. Defaults to None.
             streaming (bool, optional): Whether the model should be initialized as
             streaming. Defaults to False.
             max_response (int, optional): The maximum number of tokens the model can
@@ -46,6 +41,8 @@ class OpenAIChatModel(OpenAIModel):
         if name not in OpenAIChatModels:
             raise ValueError(f"Invalid OpenAI chat model name: {name}")
         super().__init__(*args, **kwargs)
-        self.tools = tools
+
+    def generate(self, messages: Union[Idearium, Notion], **kwargs) -> List[Notion]:
+        super().generate(messages, **kwargs)
 
     # TODO: Finish implementing this. zOz
