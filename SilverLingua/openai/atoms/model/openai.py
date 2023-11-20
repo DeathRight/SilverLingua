@@ -218,7 +218,7 @@ class OpenAIModel(Model):
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
 
-    def generate(self, messages: Union[Idearium, List[Notion]], **kwargs) -> str:
+    def generate(self, messages: Union[Idearium, List[Notion]], **kwargs):
         if messages is None:
             raise ValueError("No messages provided.")
 

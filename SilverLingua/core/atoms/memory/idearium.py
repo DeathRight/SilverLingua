@@ -68,6 +68,11 @@ class Idearium:
 
         self._trim()
 
+    def extend(self, notions: List[Notion]):
+        """Extends the Idearium with the given list of notions."""
+        for notion in notions:
+            self.append(notion)
+
     def insert(self, index: int, notion: Notion):
         """Inserts the given notion at the given index."""
         tokenized_notion = self.tokenizer["encode"](notion.content)

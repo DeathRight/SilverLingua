@@ -196,7 +196,7 @@ class Model(ABC):
     @abstractmethod
     def generate(
         self, messages: Union[Idearium, List[Notion]], *args, **kwargs
-    ) -> List[str]:
+    ) -> List[Notion]:
         """
         Calls the model with the given messages and returns the response.
 
@@ -210,7 +210,7 @@ class Model(ABC):
     @abstractmethod
     async def agenerate(
         self, messages: Union[Idearium, List[Notion]], *args, **kwargs
-    ) -> List[str]:
+    ) -> List[Notion]:
         """
         Calls the model with the given messages and returns the response
         asynchronously.
