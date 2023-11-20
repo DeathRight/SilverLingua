@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from SilverLingua.core.atoms.tool.util import FunctionCall
+from SilverLingua.core.atoms.tool.util import FunctionCall, FunctionJSONSchema
 
 # List of OpenAI models and their maximum number of tokens.
 OpenAIModels = {
@@ -14,6 +14,26 @@ OpenAIModels = {
 }
 
 OpenAIChatModels = {k: v for k, v in OpenAIModels.items() if k.startswith("gpt-")}
+
+
+class ToolChoiceFunction:
+    name: str
+
+
+class ChatCompletionToolChoice:
+    type: Literal["function"] = "function"
+    function: ToolChoiceFunction
+
+    def __init__(self, function: ToolChoiceFunction) -> None:
+        self.function = function
+
+
+class ChatCompletionInputTool:
+    type: Literal["function"] = "function"
+    function: FunctionJSONSchema
+
+    def __init__(self, function: FunctionJSONSchema) -> None:
+        self.function = function
 
 
 class ChatCompletionInputMessage:

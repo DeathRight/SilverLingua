@@ -5,17 +5,20 @@ class RoleMember:
     def __init__(self, name, value, parent=None):
         self.__dict__["_name"] = name
         self.__dict__["_value"] = value
-        self.__dict__["_parent"] = parent or self.__class__
+        self.__dict__["_parent"] = parent
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name  # type: ignore
 
     @property
-    def value(self):
+    def value(self) -> str:
         return self._value  # type: ignore
 
     def __setattr__(self, name, value):
+        if name == "_parent" and self.__dict__.get("_parent") is None:
+            self.__dict__[name] = value
+            return
         raise ImmutableAttributeError("RoleMember attributes are immutable.")
 
     def __eq__(self, other):

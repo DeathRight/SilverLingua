@@ -7,6 +7,12 @@ from ..atoms.tool import FunctionCall, FunctionResponse
 class Agent:
     """
     A wrapper around a model that utilizes an Idearium and a set of Tools.
+
+    This is a base class not meant to be used directly. It is meant to be
+    subclassed by specific model implementations.
+
+    However, there is limited boilerplate. The only thing that needs to be
+    redefined in subclasses is the _bind_tools method.
     """
 
     _tools: List[Tool]
@@ -21,6 +27,13 @@ class Agent:
         return self._model
 
     @property
+    def role(self) -> ChatRole:
+        """
+        The ChatRole object for the model.
+        """
+        return self._model.role
+
+    @property
     def idearium(self) -> Idearium:
         """
         The idearium used by the agent.
@@ -31,22 +44,11 @@ class Agent:
     def tools(self) -> List[Tool]:
         """
         The tools used by the agent.
+
+        Do not modify this list directly. Use `add_tool`, `add_tools`,
+        and `remove_tool` instead.
         """
         return self._tools
-
-    def __init__(
-        self, model: Model, idearium: Idearium = None, tools: List[Tool] = None
-    ) -> None:
-        """
-        Initializes the agent.
-        """
-        self._model = model
-        self._idearium = (
-            idearium
-            if idearium is not None
-            else Idearium(self._model.tokenizer, self._model.max_tokens)
-        )
-        self._tools = tools if tools is not None else []
 
     def _find_tool(self, name: str) -> Tool | None:
         """
@@ -73,7 +75,56 @@ class Agent:
         else:
             response = FunctionResponse("error", "Tool not found")
 
-        return Notion(response.to_json(), ChatRole.TOOL_RESPONSE)
+        return Notion(response.to_json(), self.role.TOOL_RESPONSE)
+
+    def _bind_tools(self) -> None:
+        """
+        Called at the end of __init__ to bind the tools to the model.
+
+        This MUST be redefined in subclasses to dictate how
+        the tools are bound to the model.
+        """
+        pass
+
+    def __init__(
+        self, model: Model, idearium: Idearium = None, tools: List[Tool] = None
+    ) -> None:
+        """
+        Initializes the agent.
+        """
+        self._model = model
+        self._idearium = (
+            idearium
+            if idearium is not None
+            else Idearium(self._model.tokenizer, self._model.max_tokens)
+        )
+        self._tools = tools if tools is not None else []
+
+        self._bind_tools()
+
+    def add_tool(self, tool: Tool) -> None:
+        """
+        Adds a tool to the agent.
+        """
+        self._tools.append(tool)
+        self._bind_tools()
+
+    def add_tools(self, tools: List[Tool]) -> None:
+        """
+        Adds a list of tools to the agent.
+        """
+        self._tools.extend(tools)
+        self._bind_tools()
+
+    def remove_tool(self, name: str) -> None:
+        """
+        Removes a tool from the agent.
+        """
+        for i, tool in enumerate(self._tools):
+            if tool.name == name:
+                self._tools.pop(i)
+                break
+        self._bind_tools()
 
     def generate(
         self, messages: Union[Idearium, List[Notion]], **kwargs
@@ -90,7 +141,7 @@ class Agent:
                 (Many times there will only be one response.)
         """
         self._idearium.extend(messages)
-        response = self._model.generate(self._idearium, tools=self.tools, **kwargs)[0]
+        response = self._model.generate(self._idearium, **kwargs)[0]
 
         if response.chat_role == ChatRole.TOOL_CALL:
             # Call generate again with the tool response

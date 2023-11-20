@@ -1,24 +1,37 @@
-from ....util import ImmutableMixin
+from enum import Enum
+from typing import Type
+
 from .role import RoleMember
 
 
-class ReactRole(ImmutableMixin):
-    THOUGHT = RoleMember("THOUGHT", "Thought")
-    OBSERVATION = RoleMember("OBSERVATION", "Obs")
-    ACTION = RoleMember("ACTION", "Act")
-    QUESTION = RoleMember("QUESTION", "Q")
-    ANSWER = RoleMember("ANSWER", "A")
+class ReactRole(Enum):
+    THOUGHT = RoleMember("THOUGHT", "THOUGHT")
+    OBSERVATION = RoleMember("OBSERVATION", "OBSERVATION")
+    ACTION = RoleMember("ACTION", "ACTION")
+    QUESTION = RoleMember("QUESTION", "QUESTION")
+    ANSWER = RoleMember("ANSWER", "ANSWER")
 
-    def __init__(
-        self,
-        THOUGHT="Thought",
-        OBSERVATION="Obs",
-        ACTION="Act",
-        QUESTION="Q",
-        ANSWER="A",
-    ):
-        object.__setattr__(self, "THOUGHT", RoleMember("THOUGHT", THOUGHT))
-        object.__setattr__(self, "OBSERVATION", RoleMember("OBSERVATION", OBSERVATION))
-        object.__setattr__(self, "ACTION", RoleMember("ACTION", ACTION))
-        object.__setattr__(self, "QUESTION", RoleMember("QUESTION", QUESTION))
-        object.__setattr__(self, "ANSWER", RoleMember("ANSWER", ANSWER))
+
+# Set the parent of each member to ReactRole
+for member in ReactRole:
+    member.value._parent = ReactRole
+
+
+def create_react_role(
+    name: str,
+    THOUGHT: str,
+    OBSERVATION: str,
+    ACTION: str,
+    QUESTION: str,
+    ANSWER: str,
+) -> Type[ReactRole]:
+    return Enum(
+        name,
+        {
+            "THOUGHT": RoleMember("THOUGHT", THOUGHT, ReactRole),
+            "OBSERVATION": RoleMember("OBSERVATION", OBSERVATION, ReactRole),
+            "ACTION": RoleMember("ACTION", ACTION, ReactRole),
+            "QUESTION": RoleMember("QUESTION", QUESTION, ReactRole),
+            "ANSWER": RoleMember("ANSWER", ANSWER, ReactRole),
+        },
+    )
