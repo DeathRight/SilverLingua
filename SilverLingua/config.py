@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Optional, Type
 
+from . import logger
 from .core.atoms.role import ChatRole, ReactRole
 from .core.atoms.tool import Tool
 
@@ -46,8 +47,8 @@ class Module:
 
 class Config:
     modules: List[Module] = []
-    chat_roles: List[ChatRole] = [ChatRole]
-    react_roles: List[ReactRole] = [ReactRole]
+    chat_roles: List[ChatRole] = []
+    react_roles: List[ReactRole] = []
     tools: List[Tool] = []
 
     @classmethod
@@ -128,3 +129,7 @@ class Config:
             self.add_chat_role(chat_role)
         for react_role in module.react_roles:
             self.add_react_role(react_role)
+
+        logger.info(
+            f'Registered module {module.name}@{module.version}: "{module.description}"'
+        )

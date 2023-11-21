@@ -1,10 +1,11 @@
 from .model import (
-    OpenAIModel,
-    OpenAIModels,
-    OpenAIChatModels,
     ChatCompletionChoice,
     ChatCompletionInputMessage,
     ChatCompletionOutput,
     ChatCompletionOutputMessage,
     ChatCompletionUsage,
+    OpenAIChatModels,
+    OpenAIModel,
+    OpenAIModels,
 )
+from .role import OpenAIChatRole
