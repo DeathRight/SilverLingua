@@ -59,7 +59,7 @@ class Agent:
                 return t
         return None
 
-    def _use_tool(self, notion: Notion) -> Notion:
+    def _use_tool(self, notion: Notion) -> List[Notion] | Notion:
         """
         Uses a tool based on a Notion by converting it to a FunctionCall.
 
@@ -145,7 +145,11 @@ class Agent:
 
         if response.chat_role == ChatRole.TOOL_CALL:
             # Call generate again with the tool response
-            return self.generate([self._use_tool(response)])
+            tool_response = self._use_tool(response)
+            if isinstance(tool_response, list):
+                return self.generate(tool_response)
+            else:
+                return self.generate([self._use_tool(response)])
 
     async def agenerate(
         self, messages: Union[Idearium, List[Notion]], **kwargs
@@ -166,7 +170,11 @@ class Agent:
 
         if response.chat_role == ChatRole.TOOL_CALL:
             # Call agenerate again with the tool response
-            return await self.agenerate([self._use_tool(response)])
+            tool_response = self._use_tool(response)
+            if isinstance(tool_response, list):
+                return await self.agenerate(tool_response)
+            else:
+                return await self.agenerate([tool_response])
 
     def stream(self, messages: Union[Idearium, List[Notion]], **kwargs) -> Notion:
         """

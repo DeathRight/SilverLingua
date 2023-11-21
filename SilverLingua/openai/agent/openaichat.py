@@ -1,10 +1,14 @@
 from typing import List
 
 from SilverLingua.core.agent import Agent
-from SilverLingua.core.atoms import Idearium, Tool
+from SilverLingua.core.atoms import Idearium, Notion, Tool
 
 from ..atoms import OpenAIModel
 from ..atoms.model import ChatCompletionInputTool
+from ..atoms.model.util import (
+    ChatCompletionInputMessageToolResponse,
+    ChatCompletionMessageToolCalls,
+)
 
 
 class OpenAIChatAgent(Agent):
@@ -24,6 +28,34 @@ class OpenAIChatAgent(Agent):
         ]
 
         self._model.tools = m_tools
+
+    def _use_tool(self, notion: Notion) -> List[Notion]:
+        responses: List[ChatCompletionInputMessageToolResponse] = []
+
+        tool_calls = ChatCompletionMessageToolCalls.from_json(notion.content)
+        for tool_call in tool_calls:
+            tool = self._find_tool(tool_call.function.name)
+            if tool is not None:
+                responses.append(
+                    ChatCompletionInputMessageToolResponse(
+                        tool_call.id,
+                        tool_call.function.name,
+                        tool(tool_call.function),
+                    )
+                )
+            else:
+                responses.append(
+                    ChatCompletionInputMessageToolResponse(
+                        tool_call.id,
+                        "error",
+                        "Tool not found",
+                    )
+                )
+
+        return [
+            Notion(response.to_json(), self.role.TOOL_RESPONSE)
+            for response in responses
+        ]
 
     def __init__(
         self,
