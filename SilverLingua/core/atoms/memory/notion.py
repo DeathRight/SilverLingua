@@ -1,9 +1,7 @@
 from typing import Any
 
-from memory import Memory
-
-from ....constants import config
 from ..role import ChatRole, ReactRole
+from .memory import Memory
 
 
 class Notion(Memory):
@@ -56,8 +54,10 @@ class Notion(Memory):
 
         (See `config`)
         """
+        from ....config import Config
+
         # Check if self.role is a member of Role
-        r = config.get_chat_role(self.role)
+        r = Config.get_chat_role(self.role)
         if r is None:
             # If not, then the role is AI.
             # Why? Because it must be an internal role.
@@ -71,8 +71,10 @@ class Notion(Memory):
 
         (See `config`)
         """
+        from ....config import Config
+
         # Check if self.role is a member of Role
-        r = config.get_react_role(self.role)
+        r = Config.get_react_role(self.role)
         if r is None:
             # If not, then the role is AI.
             # Why? Because it must be an internal role.

@@ -2,6 +2,7 @@ import logging
 
 from SilverLingua import Module
 
+from .agent import OpenAIChatAgent  # noqa
 from .atoms import OpenAIChatRole
 
 logger = logging.getLogger(__name__)

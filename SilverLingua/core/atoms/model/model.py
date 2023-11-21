@@ -8,9 +8,8 @@ from ..role import ChatRole
 
 class ModelType(Enum):
     CHAT = 0
-    TEXT = 1
-    EMBEDDING = 2
-    CODE = 3
+    EMBEDDING = 1
+    CODE = 2
 
 
 class Model(ABC):
@@ -223,10 +222,12 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def stream(self, prompt: str, *args, **kwargs) -> object:
+    def stream(
+        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+    ) -> Notion:
         """
-        Streams the model with the given prompt using the USER role and
-        returns the response.
+        Streams the model with the given messages and returns the response,
+        one token at a time.
 
         If the model cannot be streamed, this will raise an exception.
         """

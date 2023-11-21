@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List, Optional, Union
 
@@ -7,17 +8,19 @@ import tiktoken
 from SilverLingua.core.atoms.memory import Idearium, Notion
 from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole
-from SilverLingua.core.atoms.tool import FunctionCall, FunctionResponse
 
-from ... import logger
 from ..role import OpenAIChatRole
 from .util import (
     ChatCompletionInputMessage,
+    ChatCompletionInputMessageToolResponse,
     ChatCompletionInputTool,
+    ChatCompletionMessageToolCalls,
     ChatCompletionOutput,
     ChatCompletionToolChoice,
     OpenAIModels,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIModel(Model):
@@ -70,7 +73,7 @@ class OpenAIModel(Model):
         return self._type
 
     @property
-    def model(self) -> object:
+    def model(self) -> openai.ChatCompletion | openai.Completion:
         return self._model
 
     @property
@@ -147,19 +150,47 @@ class OpenAIModel(Model):
             input: List[ChatCompletionInputMessage] = []
             for msg in messages:
                 if msg.chat_role == ChatRole.TOOL_CALL:
+                    """
+                    # msg.content is the same as "tool_calls" in this case
+                    msg.content = [
+                        {
+                            "id": "0",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": {
+                                    "location": "New York City",
+                                }
+                            }
+                        }
+                    ]
+                    """
+                    tool_calls = ChatCompletionMessageToolCalls.from_json(msg.content)
                     input.append(
                         ChatCompletionInputMessage(
-                            role=msg.chat_role,
-                            function_call=FunctionCall.from_json(msg.content),
+                            role=OpenAIChatRole.TOOL_CALL,
+                            tool_calls=tool_calls,
                         )
                     )
                 elif msg.chat_role == ChatRole.TOOL_RESPONSE:
-                    func_response = FunctionResponse.from_json(msg.content)
+                    """
+                    msg.content = {
+                        "tool_call_id": "0",
+                        "name": "get_weather",
+                        "content": {
+                            "temperature": "70",
+                        }
+                    }
+                    """
+                    tool_response = ChatCompletionInputMessageToolResponse.from_json(
+                        msg.content
+                    )
                     input.append(
                         ChatCompletionInputMessage(
-                            role=msg.chat_role,
-                            name=func_response.name,
-                            content=func_response.content,
+                            role=OpenAIChatRole.TOOL_RESPONSE,
+                            tool_call_id=tool_response.tool_call_id,
+                            name=tool_response.name,
+                            content=tool_response.content,
                         )
                     )
                 else:
@@ -168,8 +199,6 @@ class OpenAIModel(Model):
                             role=msg.chat_role, content=msg.content
                         )
                     )
-        elif self.type == ModelType.TEXT:
-            input: str = messages[0].content
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -184,18 +213,24 @@ class OpenAIModel(Model):
             r: ChatCompletionOutput = response
             for choice in r.choices:
                 msg = choice.message
-                if hasattr(msg, "function_call") and msg.function_call is not None:
+                if hasattr(msg, "tool_calls") and msg.tool_calls is not None:
                     output.append(
                         Notion(
-                            FunctionCall.to_json(msg.function_call),
-                            OpenAIChatRole.TOOL_CALL,
+                            ChatCompletionMessageToolCalls(msg.tool_calls).to_json(),
+                            ChatRole.TOOL_CALL,
+                        )
+                    )
+                elif hasattr(msg, "tool_call_id") and msg.tool_call_id is not None:
+                    output.append(
+                        Notion(
+                            ChatCompletionInputMessageToolResponse(
+                                msg.tool_call_id, msg.name, msg.content
+                            ).to_json(),
+                            ChatRole.TOOL_RESPONSE,
                         )
                     )
                 else:
-                    output.append(Notion(msg.content, OpenAIChatRole.AI))
-        elif self.type == ModelType.TEXT:
-            response: str = response
-            output.append(Notion(r, OpenAIChatRole.AI))
+                    output.append(Notion(msg.content, ChatRole.AI))
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -214,14 +249,30 @@ class OpenAIModel(Model):
         if input is None:
             raise ValueError("No input provided.")
 
-        if self.type == ModelType.TEXT:
-            if input is not str:
-                raise ValueError("Input must be a string.")
-            return self.model.create(**self.__text_args, prompt=input)
-        elif self.type == ModelType.CHAT:
+        if self.type == ModelType.CHAT:
             if input is not list:
                 raise ValueError("Input must be a list of ChatCompletionInputMessage.")
             return self.model.create(
+                **self.__chat_args, messages=input, tool_choice=tool_choice, **kwargs
+            )
+        elif self.type == ModelType.EMBEDDING:
+            raise NotImplementedError("Embedding models are not yet supported.")
+        elif self.type == ModelType.CODE:
+            raise NotImplementedError("Code models are not yet supported.")
+
+    async def _acall(
+        self,
+        input: Union[str, List[ChatCompletionInputMessage], List[str], List[List[int]]],
+        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        **kwargs,
+    ):
+        if input is None:
+            raise ValueError("No input provided.")
+
+        if self.type == ModelType.CHAT:
+            if input is not list:
+                raise ValueError("Input must be a list of ChatCompletionInputMessage.")
+            return await self.model.acreate(
                 **self.__chat_args, messages=input, tool_choice=tool_choice, **kwargs
             )
         elif self.type == ModelType.EMBEDDING:
@@ -257,7 +308,7 @@ class OpenAIModel(Model):
         tools: List[ChatCompletionInputTool] = None,
         streaming: bool = False,
         max_response: int = 256,
-        api_key: str = os.getenv["OPENAI_API_KEY"],
+        api_key: str = "",
         top_p: float = 1.0,
         temperature: float = 1.0,
         n: int = 1,
@@ -304,28 +355,26 @@ class OpenAIModel(Model):
             returns the "best" (the one with the lowest log probability per token).
             Defaults to 1.
         """
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         openai.api_key = self.api_key
 
         if name not in OpenAIModels:
             raise ValueError(f"Invalid OpenAI model name: {name}")
         self._name = name
 
-        if self._name == "text-davinci-003":
-            self._can_stream = False
-            self._model = openai.Completion
-            self._type = ModelType.TEXT
-            logger.warning(
-                "The text-davinci-003 will be deprecated 2024-01-04. (https://openai.com/blog/gpt-4-api-general-availability)"
-            )
-        elif self._name == "text-embedding-ada-002":
+        if self._name == "text-embedding-ada-002":
             self._can_stream = False
             self._model = openai.Embedding
             self._type = ModelType.EMBEDDING
-        else:
+        elif self._name.lower().find("gpt") != -1:
             self._can_stream = True
             self._model = openai.ChatCompletion
             self._type = ModelType.CHAT
+        else:
+            raise ValueError(
+                f"Invalid OpenAI model name: {name}."
+                + "Only chat and embedding models are supported."
+            )
 
         self._streaming = self._can_stream and streaming
         self._max_response = max_response

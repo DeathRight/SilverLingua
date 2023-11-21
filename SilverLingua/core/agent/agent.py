@@ -161,9 +161,14 @@ class Agent:
             List[Notion]: A list of responses to the given messages.
                 (Many times there will only be one response.)
         """
-        pass
+        self._idearium.extend(messages)
+        response = (await self._model.agenerate(self._idearium, **kwargs))[0]
 
-    def stream(self, prompt: str, **kwargs) -> List[Notion]:
+        if response.chat_role == ChatRole.TOOL_CALL:
+            # Call agenerate again with the tool response
+            return await self.agenerate([self._use_tool(response)])
+
+    def stream(self, messages: Union[Idearium, List[Notion]], **kwargs) -> Notion:
         """
         Streams a response to the given prompt by calling the
         underlying model's stream method and checking/actualizing tool usage.
@@ -172,10 +177,9 @@ class Agent:
         streaming.
 
         Args:
-            prompt (str): The prompt to respond to.
+            messages (Union[Idearium, List[Notion]]): The messages to respond to.
 
         Returns:
-            List[Notion]: A list of responses to the given prompt.
-                (Many times there will only be one response.)
+            Notion: The model's response, one token at a time.
         """
         pass

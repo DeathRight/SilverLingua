@@ -2,6 +2,7 @@ import random
 
 from logging_config import logger
 from SilverLingua.core.atoms import Tool, prompt
+from SilverLingua.openai import OpenAIChatAgent  # noqa
 from SilverLingua.util import timeit
 
 

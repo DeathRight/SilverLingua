@@ -5,6 +5,6 @@ OpenAIChatRole = create_chat_role(
     SYSTEM="system",
     HUMAN="user",
     AI="assistant",
-    TOOL_CALL="function_call",
-    TOOL_RESPONSE="function",
+    TOOL_CALL="assistant",
+    TOOL_RESPONSE="tool",
 )
