@@ -23,8 +23,11 @@ class FunctionCall:
         data = json.loads(json_str)
         return cls(name=data["name"], arguments=data["arguments"])
 
+    def to_dict(self) -> dict:
+        return {"name": self.name, "arguments": self.arguments}
+
     def to_json(self) -> str:
-        return json.dumps(self.__dict__)
+        return json.dumps(self.to_dict())
 
     def __repr__(self) -> str:
         return self.to_json()
@@ -53,8 +56,11 @@ class FunctionResponse:
         data = json.loads(json_str)
         return cls(name=data["name"], response=data["content"])
 
+    def to_dict(self) -> dict:
+        return {"name": self.name, "content": self.content}
+
     def to_json(self) -> str:
-        return json.dumps(self.__dict__)
+        return json.dumps(self.to_dict())
 
     def __repr__(self) -> str:
         return self.to_json()

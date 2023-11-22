@@ -24,10 +24,12 @@ class OpenAIChatAgent(Agent):
 
     def _bind_tools(self) -> None:
         m_tools: List[ChatCompletionInputTool] = [
-            ChatCompletionInputTool(tool.description) for tool in self.tools
+            ChatCompletionInputTool(tool.description).to_dict() for tool in self.tools
         ]
 
-        self._model.tools = m_tools
+        # Check to make sure m_tools is not empty
+        if len(m_tools) > 0:
+            self._model.tools = m_tools
 
     def _use_tool(self, notion: Notion) -> List[Notion]:
         responses: List[ChatCompletionInputMessageToolResponse] = []
@@ -53,7 +55,7 @@ class OpenAIChatAgent(Agent):
                 )
 
         return [
-            Notion(response.to_json(), self.role.TOOL_RESPONSE)
+            Notion(response.to_json(), str(self.role.TOOL_RESPONSE.value))
             for response in responses
         ]
 

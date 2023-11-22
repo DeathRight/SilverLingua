@@ -55,7 +55,7 @@ class Idearium:
 
     def append(self, notion: Notion):
         """Appends the given notion to the end of the Idearium."""
-        tokenized_notion = self.tokenizer["encode"](notion.content)
+        tokenized_notion = self.tokenizer.encode(notion.content)
 
         if len(tokenized_notion) > self.max_tokens:
             raise ValueError("Notion exceeds maximum token length")

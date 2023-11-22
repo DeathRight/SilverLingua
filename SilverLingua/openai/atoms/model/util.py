@@ -28,6 +28,12 @@ class ChatCompletionToolChoice:
     def __init__(self, function: ToolChoiceFunction) -> None:
         self.function = function
 
+    def to_dict(self):
+        return {
+            "type": self.type,
+            "function": {"name": self.function.name},
+        }
+
 
 class ChatCompletionInputTool:
     type: Literal["function"] = "function"
@@ -35,6 +41,15 @@ class ChatCompletionInputTool:
 
     def __init__(self, function: FunctionJSONSchema) -> None:
         self.function = function
+
+    def to_dict(self):
+        return {
+            "type": self.type,
+            "function": self.function.to_dict(),
+        }
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
 
 
 ####################
@@ -48,6 +63,22 @@ class ChatCompletionMessageTool:
     def __init__(self, id: str, function: FunctionCall) -> None:
         self.id = id
         self.function = function
+
+    def to_json(self):
+        return json.dumps(
+            {
+                "id": self.id,
+                "type": self.type,
+                "function": self.function.to_json(),
+            }
+        )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "type": self.type,
+            "function": self.function.to_dict(),
+        }
 
 
 class ChatCompletionMessageToolCalls(List):
@@ -130,6 +161,22 @@ class ChatCompletionInputMessage:
         self.tool_calls = tool_calls
         self.tool_call_id = tool_call_id
         self.name = name
+
+    def to_dict(self):
+        dict = {"role": self.role}
+
+        if self.content:
+            dict["content"] = self.content
+        if self.tool_calls:
+            dict["tool_calls"] = [tool_call.to_dict() for tool_call in self.tool_calls]
+        if self.tool_call_id:
+            dict["tool_call_id"] = self.tool_call_id
+        if self.name:
+            dict["name"] = self.name
+        return dict
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
 
 
 class ChatCompletionOutputMessage:

@@ -1,8 +1,11 @@
 import random
 
+from dotenv import load_dotenv
+
 from logging_config import logger
-from SilverLingua.core.atoms import Tool, prompt
+from SilverLingua.core.atoms import Notion, Tool, prompt
 from SilverLingua.openai import OpenAIChatAgent  # noqa
+from SilverLingua.openai.atoms.role.chat import OpenAIChatRole
 from SilverLingua.util import timeit
 
 
@@ -62,3 +65,14 @@ def roll_dice(
 
 
 logger.debug(Tool(roll_dice).name)
+
+##########
+load_dotenv()
+# openai.api_key = dote
+agent = OpenAIChatAgent("gpt-4-1106-preview")
+
+response = agent.generate(
+    [Notion("Hello, how are you?", str(OpenAIChatRole.HUMAN.value))]
+)
+
+logger.debug(response[0])

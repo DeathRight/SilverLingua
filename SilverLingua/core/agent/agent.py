@@ -84,14 +84,14 @@ class Agent:
                     responses.append(
                         Notion(
                             FunctionResponse(fc.name, tool(fc)).to_json(),
-                            self.role.TOOL_RESPONSE,
+                            str(self.role.TOOL_RESPONSE.value),
                         )
                     )
                 else:
                     responses.append(
                         Notion(
                             FunctionResponse("error", "Tool not found").to_json(),
-                            self.role.TOOL_RESPONSE,
+                            str(self.role.TOOL_RESPONSE.value),
                         )
                     )
             return responses
@@ -101,12 +101,12 @@ class Agent:
             if tool is not None:
                 return Notion(
                     FunctionResponse(fc.name, tool(fc)).to_json(),
-                    self.role.TOOL_RESPONSE,
+                    str(self.role.TOOL_RESPONSE.value),
                 )
             else:
                 return Notion(
                     FunctionResponse("error", "Tool not found").to_json(),
-                    self.role.TOOL_RESPONSE,
+                    str(self.role.TOOL_RESPONSE.value),
                 )
 
     def _bind_tools(self) -> None:
@@ -173,8 +173,9 @@ class Agent:
                 (Many times there will only be one response.)
         """
         self._idearium.extend(messages)
-        response = self._model.generate(self._idearium, **kwargs)[0]
+        responses = self._model.generate(self._idearium, **kwargs)
 
+        response = responses[0]
         if response.chat_role == ChatRole.TOOL_CALL:
             # Call generate again with the tool response
             tool_response = self._use_tool(response)
@@ -182,6 +183,8 @@ class Agent:
                 return self.generate(tool_response)
             else:
                 return self.generate([self._use_tool(response)])
+        else:
+            return responses
 
     async def agenerate(
         self, messages: Union[Idearium, List[Notion]], **kwargs
@@ -198,8 +201,9 @@ class Agent:
                 (Many times there will only be one response.)
         """
         self._idearium.extend(messages)
-        response = (await self._model.agenerate(self._idearium, **kwargs))[0]
+        responses = await self._model.agenerate(self._idearium, **kwargs)
 
+        response = responses[0]
         if response.chat_role == ChatRole.TOOL_CALL:
             # Call agenerate again with the tool response
             tool_response = self._use_tool(response)
@@ -207,6 +211,8 @@ class Agent:
                 return await self.agenerate(tool_response)
             else:
                 return await self.agenerate([tool_response])
+        else:
+            return responses
 
     def stream(self, messages: Union[Idearium, List[Notion]], **kwargs) -> Notion:
         """

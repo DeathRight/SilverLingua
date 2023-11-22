@@ -609,6 +609,20 @@ embeddings = ["matplotlib", "numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "
 wandb = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)", "wandb"]
 
 [[package]]
+name = "python-dotenv"
+version = "1.0.0"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "python-dotenv-1.0.0.tar.gz", hash = "sha256:a8df96034aae6d2d50a4ebe8216326c61c3eb64836776504fcca410e5937a3ba"},
+    {file = "python_dotenv-1.0.0-py3-none-any.whl", hash = "sha256:f5971a9226b701070a4bf2c38c89e5a3f0d64de8debda981d1db98583009122a"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "regex"
 version = "2023.8.8"
 description = "Alternative regular expression module, to replace re."
@@ -923,4 +937,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11.0,<3.12"
-content-hash = "a082efe388c547e87c2f22fecf49cc01753fc06bac8645df12632ca479a51bdf"
+content-hash = "c077504c67bd21978ac94c28125ee0a27ae5346022e5a83015b67901f37cbba6"

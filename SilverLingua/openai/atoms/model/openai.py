@@ -105,50 +105,67 @@ class OpenAIModel(Model):
         """
         Boilerplate arguments for the OpenAI chat completion API to be unpacked.
         """
-        return {
+        dict = {
             "model": self.name,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "n": self.n,
             "stream": self.streaming,
-            "stop": self.stop,
             "max_tokens": self.max_response,
             "presence_penalty": self.presence_penalty,
             "frequency_penalty": self.frequency_penalty,
-            "logit_bias": self.logit_bias,
-            "tools": self.tools,
         }
+        if self.tools is not None:
+            dict["tools"] = self.tools
+        if self.stop is not None:
+            dict["stop"] = self.stop
+        if self.logit_bias is not None:
+            dict["logit_bias"] = self.logit_bias
+        return dict
 
     @property
     def __text_args(self):
         """
         Boilerplate arguments for the OpenAI text completion API to be unpacked.
         """
-        return {
+        dict = {
             "model": self.name,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "n": self.n,
-            "stop": self.stop,
             "max_tokens": self.max_response,
             "presence_penalty": self.presence_penalty,
             "frequency_penalty": self.frequency_penalty,
-            "logit_bias": self.logit_bias,
         }
+        if self.stop is not None:
+            dict["stop"] = self.stop
+        if self.logit_bias is not None:
+            dict["logit_bias"] = self.logit_bias
+        return dict
 
     def _preprocess(self, messages: List[Notion]):
+        msgs: List[Notion] = []
         for msg in messages:
-            # Ensure all roles are OpenAIChatRole members
-            msg.chat_role = OpenAIChatRole[msg.chat_role]
-        return messages
+            logger.debug(
+                f"msg: {msg}; msg.chat_role: [name: {msg.chat_role.name}, value: {msg.chat_role.value}]; msg.role: {msg.role}"
+            )
+            msgs.append(
+                Notion(
+                    msg.content,
+                    str(OpenAIChatRole[msg.chat_role.name].value),
+                    msg.persisent,
+                )
+            )
+        return msgs
 
     def _format_request(
         self, messages: List[Notion]
     ) -> Union[str, List[ChatCompletionInputMessage]]:
-        input = None
+        input: Union[str, List[ChatCompletionInputMessage]] = []
         if self.type == ModelType.CHAT:
             input: List[ChatCompletionInputMessage] = []
             for msg in messages:
+                logger.debug(f"msg: {msg}")
                 if msg.chat_role == ChatRole.TOOL_CALL:
                     """
                     # msg.content is the same as "tool_calls" in this case
@@ -168,7 +185,7 @@ class OpenAIModel(Model):
                     tool_calls = ChatCompletionMessageToolCalls.from_json(msg.content)
                     input.append(
                         ChatCompletionInputMessage(
-                            role=OpenAIChatRole.TOOL_CALL,
+                            role=str(OpenAIChatRole.TOOL_CALL.value),
                             tool_calls=tool_calls,
                         )
                     )
@@ -187,7 +204,7 @@ class OpenAIModel(Model):
                     )
                     input.append(
                         ChatCompletionInputMessage(
-                            role=OpenAIChatRole.TOOL_RESPONSE,
+                            role=str(OpenAIChatRole.TOOL_RESPONSE.value),
                             tool_call_id=tool_response.tool_call_id,
                             name=tool_response.name,
                             content=tool_response.content,
@@ -195,9 +212,7 @@ class OpenAIModel(Model):
                     )
                 else:
                     input.append(
-                        ChatCompletionInputMessage(
-                            role=msg.chat_role, content=msg.content
-                        )
+                        ChatCompletionInputMessage(role=msg.role, content=msg.content)
                     )
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
@@ -217,7 +232,7 @@ class OpenAIModel(Model):
                     output.append(
                         Notion(
                             ChatCompletionMessageToolCalls(msg.tool_calls).to_json(),
-                            ChatRole.TOOL_CALL,
+                            str(ChatRole.TOOL_RESPONSE.value),
                         )
                     )
                 elif hasattr(msg, "tool_call_id") and msg.tool_call_id is not None:
@@ -226,11 +241,11 @@ class OpenAIModel(Model):
                             ChatCompletionInputMessageToolResponse(
                                 msg.tool_call_id, msg.name, msg.content
                             ).to_json(),
-                            ChatRole.TOOL_RESPONSE,
+                            str(ChatRole.TOOL_RESPONSE.value),
                         )
                     )
                 else:
-                    output.append(Notion(msg.content, ChatRole.AI))
+                    output.append(Notion(msg.content, str(OpenAIChatRole.AI.value)))
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -250,11 +265,19 @@ class OpenAIModel(Model):
             raise ValueError("No input provided.")
 
         if self.type == ModelType.CHAT:
-            if input is not list:
+            if not isinstance(input, list):
                 raise ValueError("Input must be a list of ChatCompletionInputMessage.")
-            return self.model.create(
-                **self.__chat_args, messages=input, tool_choice=tool_choice, **kwargs
-            )
+
+            inp = [msg.to_dict() for msg in input]
+            if tool_choice is not None:
+                return self.model.create(
+                    **self.__chat_args,
+                    messages=inp,
+                    tool_choice=tool_choice,
+                    **kwargs,
+                )
+            else:
+                return self.model.create(**self.__chat_args, messages=inp, **kwargs)
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -272,15 +295,69 @@ class OpenAIModel(Model):
         if self.type == ModelType.CHAT:
             if input is not list:
                 raise ValueError("Input must be a list of ChatCompletionInputMessage.")
-            return await self.model.acreate(
-                **self.__chat_args, messages=input, tool_choice=tool_choice, **kwargs
-            )
+
+            inp = [msg.to_dict() for msg in input]
+            if tool_choice is not None:
+                return await self.model.create(
+                    **self.__chat_args,
+                    messages=inp,
+                    tool_choice=tool_choice,
+                    **kwargs,
+                )
+            else:
+                return await self.model.create(
+                    **self.__chat_args, messages=inp, **kwargs
+                )
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
 
     def generate(
+        self,
+        messages: Union[Idearium, List[Notion]],
+        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        **kwargs,
+    ):
+        if messages is None:
+            raise ValueError("No messages provided.")
+
+        # If messages is not an Idearium, convert it to one
+        # so we can take advantage of its automatic trimming.
+        if not isinstance(messages, Idearium):
+            messages = Idearium(self.tokenizer, self.max_tokens, messages)
+
+        input = self._format_request(self._preprocess(messages))
+
+        output = self._standardize_response(
+            self._call(input, tool_choice=tool_choice, **kwargs)
+        )
+
+        return self._postprocess(output)
+
+    async def agenerate(
+        self,
+        messages: Union[Idearium, List[Notion]],
+        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        **kwargs,
+    ):
+        if messages is None:
+            raise ValueError("No messages provided.")
+
+        # If messages is not an Idearium, convert it to one
+        # so we can take advantage of its automatic trimming.
+        if not isinstance(messages, Idearium):
+            messages = Idearium(self.tokenizer, self.max_tokens, messages)
+
+        input = self._format_request(self._preprocess(messages))
+
+        output = self._standardize_response(
+            await self._acall(input, tool_choice=tool_choice, **kwargs)
+        )
+
+        return self._postprocess(output)
+
+    def stream(
         self,
         messages: Union[Idearium, List[Notion]],
         tool_choice: Optional[ChatCompletionToolChoice] = None,
