@@ -1,3 +1,4 @@
+import json
 from typing import List, Union
 
 from ..atoms import ChatRole, Idearium, Model, Notion, Tool
@@ -61,21 +62,52 @@ class Agent:
 
     def _use_tool(self, notion: Notion) -> List[Notion] | Notion:
         """
-        Uses a tool based on a Notion by converting it to a FunctionCall.
+        Uses a tool or tools based on the given notion, turning the notion's
+        content into a FunctionCall or FunctionCall list and calling the
+        appropriate tool(s).
 
-        Returns a Notion with the response from the tool as the content and
-        the role as TOOL_RESPONSE.
+        Args:
+            notion (Notion): The notion that's content contains the
+            FunctionCall(s).
+
+        Returns:
+            List[Notion] | Notion: The response(s) to the tool call(s). The role
+            will be ChatRole.TOOL_RESPONSE.
         """
-        response: FunctionResponse
-
-        fc = FunctionCall.from_json(notion.content)
-        tool = self._find_tool(fc.name)
-        if tool is not None:
-            response = FunctionResponse(fc.name, tool(fc))
+        content = json.loads(notion.content)
+        if isinstance(content, list):
+            responses: List[Notion] = []
+            for tc in content:
+                fc = FunctionCall.from_json(tc)
+                tool = self._find_tool(fc.name)
+                if tool is not None:
+                    responses.append(
+                        Notion(
+                            FunctionResponse(fc.name, tool(fc)).to_json(),
+                            self.role.TOOL_RESPONSE,
+                        )
+                    )
+                else:
+                    responses.append(
+                        Notion(
+                            FunctionResponse("error", "Tool not found").to_json(),
+                            self.role.TOOL_RESPONSE,
+                        )
+                    )
+            return responses
         else:
-            response = FunctionResponse("error", "Tool not found")
-
-        return Notion(response.to_json(), self.role.TOOL_RESPONSE)
+            fc = FunctionCall.from_json(content)
+            tool = self._find_tool(fc.name)
+            if tool is not None:
+                return Notion(
+                    FunctionResponse(fc.name, tool(fc)).to_json(),
+                    self.role.TOOL_RESPONSE,
+                )
+            else:
+                return Notion(
+                    FunctionResponse("error", "Tool not found").to_json(),
+                    self.role.TOOL_RESPONSE,
+                )
 
     def _bind_tools(self) -> None:
         """
