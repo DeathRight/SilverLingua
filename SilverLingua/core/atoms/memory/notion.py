@@ -18,7 +18,7 @@ class Notion(Memory):
     """
 
     role: str
-    persisent: bool = False
+    persistent: bool = False
 
     def __init__(self, content: str, role: Any, persistent: bool = False) -> None:
         super().__init__(content)

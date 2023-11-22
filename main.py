@@ -64,15 +64,24 @@ def roll_dice(
     return ret
 
 
-logger.debug(Tool(roll_dice).name)
+rd_tool = Tool(roll_dice)
+logger.debug(rd_tool.name)
 
 ##########
 load_dotenv()
-# openai.api_key = dote
-agent = OpenAIChatAgent("gpt-4-1106-preview")
+agent = OpenAIChatAgent()  # ("gpt-4-1106-preview")
+agent.add_tool(rd_tool)
 
-response = agent.generate(
-    [Notion("Hello, how are you?", str(OpenAIChatRole.HUMAN.value))]
-)
+# Start command line chat with agent
+try:
+    while True:
+        message = input("You: ")
 
-logger.debug(response[0])
+        if message == "exit":
+            break
+
+        response = agent.generate([Notion(message, str(OpenAIChatRole.HUMAN.value))])
+        agent.idearium.append(response[0])
+        print(response[0])
+finally:
+    print("Chat session ended.")

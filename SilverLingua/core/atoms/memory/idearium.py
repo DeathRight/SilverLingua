@@ -18,6 +18,8 @@ class Idearium:
     number of tokens.
     """
 
+    _notions: List[Notion] = []
+
     def __init__(
         self, tokenizer: Tokenizer, max_tokens: int, notions: List[Notion] = None
     ):
@@ -59,6 +61,21 @@ class Idearium:
 
         if len(tokenized_notion) > self.max_tokens:
             raise ValueError("Notion exceeds maximum token length")
+
+        # Check if this notion is a continuation of the previous notion
+        if (
+            len(self._notions) > 0
+            and self._notions[-1].role == notion.role
+            and self._notions[-1].persistent == notion.persistent
+        ):
+            # Create a new notion with the combined content
+            # and replace the previous notion with it
+            combined_content = self._notions[-1].content + notion.content
+            self.replace(
+                len(self._notions) - 1,
+                Notion(combined_content, notion.role, notion.persistent),
+            )
+            return
 
         self._notions.append(notion)
         self.tokenized_notions.append(tokenized_notion)

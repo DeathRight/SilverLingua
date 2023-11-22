@@ -45,7 +45,7 @@ class ChatCompletionInputTool:
     def to_dict(self):
         return {
             "type": self.type,
-            "function": self.function.to_dict(),
+            "function": self.function,
         }
 
     def to_json(self):
@@ -69,7 +69,7 @@ class ChatCompletionMessageTool:
             {
                 "id": self.id,
                 "type": self.type,
-                "function": self.function.to_json(),
+                "function": self.function.to_dict(),
             }
         )
 
@@ -163,17 +163,22 @@ class ChatCompletionInputMessage:
         self.name = name
 
     def to_dict(self):
-        dict = {"role": self.role}
+        _dict = {"role": self.role}
 
         if self.content:
-            dict["content"] = self.content
+            _dict["content"] = self.content
         if self.tool_calls:
-            dict["tool_calls"] = [tool_call.to_dict() for tool_call in self.tool_calls]
+            if isinstance(self.tool_calls[0], dict):
+                _dict["tool_calls"] = self.tool_calls
+            else:
+                _dict["tool_calls"] = [
+                    tool_call.to_dict() for tool_call in self.tool_calls
+                ]
         if self.tool_call_id:
-            dict["tool_call_id"] = self.tool_call_id
+            _dict["tool_call_id"] = self.tool_call_id
         if self.name:
-            dict["name"] = self.name
-        return dict
+            _dict["name"] = self.name
+        return _dict
 
     def to_json(self):
         return json.dumps(self.to_dict())

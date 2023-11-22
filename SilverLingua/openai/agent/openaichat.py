@@ -1,12 +1,15 @@
-from typing import List
+import json
+from typing import List, Optional
 
 from SilverLingua.core.agent import Agent
 from SilverLingua.core.atoms import Idearium, Notion, Tool
+from SilverLingua.core.atoms.tool.util import FunctionCall
 
 from ..atoms import OpenAIModel
 from ..atoms.model import ChatCompletionInputTool
 from ..atoms.model.util import (
     ChatCompletionInputMessageToolResponse,
+    ChatCompletionMessageTool,
     ChatCompletionMessageToolCalls,
 )
 
@@ -35,20 +38,24 @@ class OpenAIChatAgent(Agent):
         responses: List[ChatCompletionInputMessageToolResponse] = []
 
         tool_calls = ChatCompletionMessageToolCalls.from_json(notion.content)
-        for tool_call in tool_calls:
-            tool = self._find_tool(tool_call.function.name)
+        for tool_call in tool_calls._tool_calls:
+            t = ChatCompletionMessageTool(
+                tool_call["id"],
+                FunctionCall.from_json(json.dumps(tool_call["function"])),
+            )
+            tool = self._find_tool(t.function.name)
             if tool is not None:
                 responses.append(
                     ChatCompletionInputMessageToolResponse(
-                        tool_call.id,
-                        tool_call.function.name,
-                        tool(tool_call.function),
+                        t.id,
+                        t.function.name,
+                        tool(t.function),
                     )
                 )
             else:
                 responses.append(
                     ChatCompletionInputMessageToolResponse(
-                        tool_call.id,
+                        t.id,
                         "error",
                         "Tool not found",
                     )
@@ -61,10 +68,10 @@ class OpenAIChatAgent(Agent):
 
     def __init__(
         self,
-        model_name: str,
+        model_name: Optional[str] = None,
         idearium: Idearium = None,
         tools: List[Tool] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Initializes the OpenAI chat agent.

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import List, Optional, Union
@@ -146,14 +147,11 @@ class OpenAIModel(Model):
     def _preprocess(self, messages: List[Notion]):
         msgs: List[Notion] = []
         for msg in messages:
-            logger.debug(
-                f"msg: {msg}; msg.chat_role: [name: {msg.chat_role.name}, value: {msg.chat_role.value}]; msg.role: {msg.role}"
-            )
             msgs.append(
                 Notion(
                     msg.content,
                     str(OpenAIChatRole[msg.chat_role.name].value),
-                    msg.persisent,
+                    msg.persistent,
                 )
             )
         return msgs
@@ -165,30 +163,50 @@ class OpenAIModel(Model):
         if self.type == ModelType.CHAT:
             input: List[ChatCompletionInputMessage] = []
             for msg in messages:
-                logger.debug(f"msg: {msg}")
-                if msg.chat_role == ChatRole.TOOL_CALL:
-                    """
-                    # msg.content is the same as "tool_calls" in this case
-                    msg.content = [
-                        {
-                            "id": "0",
-                            "type": "function",
-                            "function": {
-                                "name": "get_weather",
-                                "arguments": {
-                                    "location": "New York City",
+                # logger.debug(f"msg: {msg}")
+                if msg.chat_role == ChatRole.AI:
+                    msg_content = ""
+                    try:
+                        msg_content = json.loads(msg.content)
+                    except json.decoder.JSONDecodeError:
+                        msg_content = msg.content
+                    if (
+                        isinstance(msg_content, list)
+                        and len(msg_content) > 0
+                        and isinstance(msg_content[0], dict)
+                        and "function" in msg_content[0]
+                    ):
+                        """
+                        # msg.content is the same as "tool_calls" in this case
+                        msg.content = [
+                            {
+                                "id": "0",
+                                "type": "function",
+                                "function": {
+                                    "name": "get_weather",
+                                    "arguments": {
+                                        "location": "New York City",
+                                    }
                                 }
                             }
-                        }
-                    ]
-                    """
-                    tool_calls = ChatCompletionMessageToolCalls.from_json(msg.content)
-                    input.append(
-                        ChatCompletionInputMessage(
-                            role=str(OpenAIChatRole.TOOL_CALL.value),
-                            tool_calls=tool_calls,
+                        ]
+                        """
+                        tool_calls = ChatCompletionMessageToolCalls.from_json(
+                            msg.content
                         )
-                    )
+                        # logger.debug("msg has tool_calls")
+                        ccim = ChatCompletionInputMessage(
+                            role=str(OpenAIChatRole.TOOL_CALL.value),
+                            tool_calls=tool_calls._tool_calls,
+                        )
+                        # logger.debug(f"ccim: {ccim.to_json()}")
+                        input.append(ccim)
+                    else:
+                        input.append(
+                            ChatCompletionInputMessage(
+                                role=msg.role, content=msg.content
+                            )
+                        )
                 elif msg.chat_role == ChatRole.TOOL_RESPONSE:
                     """
                     msg.content = {
@@ -218,6 +236,9 @@ class OpenAIModel(Model):
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
+        logger.debug(
+            f"input: {json.dumps([ccim.to_json() for ccim in input], indent=2)}"
+        )
         return input
 
     def _standardize_response(
@@ -228,14 +249,17 @@ class OpenAIModel(Model):
             r: ChatCompletionOutput = response
             for choice in r.choices:
                 msg = choice.message
+                # logger.debug(f"msg: {msg}")
                 if hasattr(msg, "tool_calls") and msg.tool_calls is not None:
+                    # logger.debug("msg has tool_calls")
                     output.append(
                         Notion(
                             ChatCompletionMessageToolCalls(msg.tool_calls).to_json(),
-                            str(ChatRole.TOOL_RESPONSE.value),
+                            str(ChatRole.TOOL_CALL.value),
                         )
                     )
                 elif hasattr(msg, "tool_call_id") and msg.tool_call_id is not None:
+                    # logger.debug("msg has tool_call_id")
                     output.append(
                         Notion(
                             ChatCompletionInputMessageToolResponse(
@@ -377,6 +401,8 @@ class OpenAIModel(Model):
             self._call(input, tool_choice=tool_choice, **kwargs)
         )
 
+        # TODO: Implement streaming properly
+
         return self._postprocess(output)
 
     def __init__(
@@ -435,9 +461,9 @@ class OpenAIModel(Model):
         self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         openai.api_key = self.api_key
 
-        if name not in OpenAIModels:
+        if name is not None and name not in OpenAIModels:
             raise ValueError(f"Invalid OpenAI model name: {name}")
-        self._name = name
+        self._name = name or "gpt-3.5-turbo"
 
         if self._name == "text-embedding-ada-002":
             self._can_stream = False

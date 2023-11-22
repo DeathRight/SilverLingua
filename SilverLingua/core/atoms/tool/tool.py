@@ -56,12 +56,20 @@ class Tool:
         """
         Uses a FunctionCall to call the function.
         """
-        return self.function(**function_call.arguments)
+        arguments_dict = function_call.arguments
+        if isinstance(function_call.arguments, str):
+            try:
+                arguments_dict = json.loads(function_call.arguments)
+            except json.JSONDecodeError:
+                raise ValueError(
+                    "FunctionCall.arguments must be a JSON string or a dict."
+                ) from None
+        return json.dumps(self.function(**arguments_dict))
 
     def __call__(self, *args, **kwargs):
         if len(args) == 1 and isinstance(args[0], FunctionCall):
             return self.use_function_call(args[0])
-        return self.function(*args, **kwargs)
+        return json.dumps(self.function(*args, **kwargs))
 
     def __str__(self):
         return self.to_json()

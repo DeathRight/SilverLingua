@@ -1,8 +1,11 @@
 import json
+import logging
 from typing import List, Union
 
 from ..atoms import ChatRole, Idearium, Model, Notion, Tool
 from ..atoms.tool import FunctionCall, FunctionResponse
+
+logger = logging.getLogger(__name__)
 
 
 class Agent:
@@ -176,9 +179,14 @@ class Agent:
         responses = self._model.generate(self._idearium, **kwargs)
 
         response = responses[0]
+        # logger.debug(f"Response: {response}")
         if response.chat_role == ChatRole.TOOL_CALL:
+            # logger.debug("Tool call detected")
+            # Add the tool call to the idearium
+            self._idearium.append(response)
             # Call generate again with the tool response
             tool_response = self._use_tool(response)
+            # logger.debug(f"Tool response: {tool_response}")
             if isinstance(tool_response, list):
                 return self.generate(tool_response)
             else:
@@ -190,7 +198,7 @@ class Agent:
         self, messages: Union[Idearium, List[Notion]], **kwargs
     ) -> List[Notion]:
         """
-        Generates a response to the given messages by calling the
+        Asynchronously generates a response to the given messages by calling the
         underlying model's agenerate method and checking/actualizing tool usage.
 
         Args:
@@ -204,18 +212,24 @@ class Agent:
         responses = await self._model.agenerate(self._idearium, **kwargs)
 
         response = responses[0]
+        # logger.debug(f"Response: {response}")
         if response.chat_role == ChatRole.TOOL_CALL:
-            # Call agenerate again with the tool response
+            # logger.debug("Tool call detected")
+            # Add the tool call to the idearium
+            self._idearium.append(response)
+            # Call generate again with the tool response
             tool_response = self._use_tool(response)
+            # logger.debug(f"Tool response: {tool_response}")
             if isinstance(tool_response, list):
-                return await self.agenerate(tool_response)
+                return await self.generate(tool_response)
             else:
-                return await self.agenerate([tool_response])
+                return await self.generate([self._use_tool(response)])
         else:
             return responses
 
     def stream(self, messages: Union[Idearium, List[Notion]], **kwargs) -> Notion:
         """
+        [NOT YET IMPLEMENTED]
         Streams a response to the given prompt by calling the
         underlying model's stream method and checking/actualizing tool usage.
 
@@ -228,4 +242,5 @@ class Agent:
         Returns:
             Notion: The model's response, one token at a time.
         """
+        logger.warn("Streaming is not yet supported.")
         pass

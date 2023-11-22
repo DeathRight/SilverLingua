@@ -62,12 +62,9 @@ class Config:
         This is usually used internally for maintaining
         consistency in Notions across different LLM backends.
         """
-        logger.debug(f"Looking for role: {role}")
         for enum_class in self.chat_roles:
             for enum_member in enum_class:
-                # logger.debug(f"Enum member: {enum_member.name}, {enum_member.value}")
-                if str(enum_member.value).lower() == role:
-                    logger.debug(f"Found enum member: {enum_member.name}")
+                if str(enum_member.value).lower() == str(role).lower():
                     return ChatRole[enum_member.name]
         return None
 
