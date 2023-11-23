@@ -3,23 +3,32 @@ import logging
 import os
 from typing import List, Optional, Union
 
-import openai
 import tiktoken
+from openai import AsyncOpenAI, OpenAI
+from openai.resources import (
+    AsyncCompletions,
+    AsyncEmbeddings,
+    AsyncModerations,
+    Completions,
+    Embeddings,
+    Moderations,
+)
+from openai.types.chat import (
+    ChatCompletion,
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionMessageToolCall,
+    ChatCompletionToolChoiceOptionParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionToolParam,
+)
 
 from SilverLingua.core.atoms.memory import Idearium, Notion
 from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole
 
 from ..role import OpenAIChatRole
-from .util import (
-    ChatCompletionInputMessage,
-    ChatCompletionInputMessageToolResponse,
-    ChatCompletionInputTool,
-    ChatCompletionMessageToolCalls,
-    ChatCompletionOutput,
-    ChatCompletionToolChoice,
-    OpenAIModels,
-)
+from .util import OpenAIModels
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +38,10 @@ class OpenAIModel(Model):
     An OpenAI model.
     """
 
+    # OpenAI clients
+    client: OpenAI
+    client_async: AsyncOpenAI
+
     # Completion parameters
     temperature: float
     top_p: float
@@ -37,7 +50,7 @@ class OpenAIModel(Model):
     presence_penalty: float
     frequency_penalty: float
     logit_bias: Optional[dict]
-    tools: Optional[List[ChatCompletionInputTool]]
+    tools: Optional[List[ChatCompletionToolParam]]
 
     # Text completion specific parameters
     suffix: Optional[str]
@@ -59,11 +72,18 @@ class OpenAIModel(Model):
         return self._api_key
 
     @property
-    def moderation(self) -> openai.Moderation:
+    def moderation(self) -> Moderations:
         """
         The moderation object used to check if text violates OpenAI's content policy.
         """
-        return openai.Moderation
+        return self.client.moderations
+
+    @property
+    def moderation_async(self) -> AsyncModerations:
+        """
+        The moderation object used to check if text violates OpenAI's content policy.
+        """
+        return self.client_async.moderations
 
     @property
     def name(self) -> str:
@@ -74,16 +94,16 @@ class OpenAIModel(Model):
         return self._type
 
     @property
-    def model(self) -> openai.ChatCompletion | openai.Completion:
+    def model(self) -> Completions | Embeddings:
         return self._model
+
+    @property
+    def model_async(self) -> AsyncCompletions | AsyncEmbeddings:
+        return self._model_async
 
     @property
     def can_stream(self) -> bool:
         return self._can_stream
-
-    @property
-    def streaming(self) -> bool:
-        return self._streaming
 
     @property
     def max_tokens(self) -> int:
@@ -111,33 +131,12 @@ class OpenAIModel(Model):
             "temperature": self.temperature,
             "top_p": self.top_p,
             "n": self.n,
-            "stream": self.streaming,
             "max_tokens": self.max_response,
             "presence_penalty": self.presence_penalty,
             "frequency_penalty": self.frequency_penalty,
         }
         if self.tools is not None:
             dict["tools"] = self.tools
-        if self.stop is not None:
-            dict["stop"] = self.stop
-        if self.logit_bias is not None:
-            dict["logit_bias"] = self.logit_bias
-        return dict
-
-    @property
-    def __text_args(self):
-        """
-        Boilerplate arguments for the OpenAI text completion API to be unpacked.
-        """
-        dict = {
-            "model": self.name,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "n": self.n,
-            "max_tokens": self.max_response,
-            "presence_penalty": self.presence_penalty,
-            "frequency_penalty": self.frequency_penalty,
-        }
         if self.stop is not None:
             dict["stop"] = self.stop
         if self.logit_bias is not None:
@@ -158,18 +157,21 @@ class OpenAIModel(Model):
 
     def _format_request(
         self, messages: List[Notion]
-    ) -> Union[str, List[ChatCompletionInputMessage]]:
-        input: Union[str, List[ChatCompletionInputMessage]] = []
+    ) -> Union[str, List[ChatCompletionMessageParam]]:
+        input: Union[str, List[ChatCompletionMessageParam]] = []
         if self.type == ModelType.CHAT:
-            input: List[ChatCompletionInputMessage] = []
+            input: List[ChatCompletionMessageParam] = []
             for msg in messages:
                 # logger.debug(f"msg: {msg}")
+
+                msg_content = ""
+                try:
+                    msg_content = json.loads(msg.content)
+                except json.decoder.JSONDecodeError:
+                    msg_content = msg.content
+
                 if msg.chat_role == ChatRole.AI:
-                    msg_content = ""
-                    try:
-                        msg_content = json.loads(msg.content)
-                    except json.decoder.JSONDecodeError:
-                        msg_content = msg.content
+                    ccim: ChatCompletionAssistantMessageParam
                     if (
                         isinstance(msg_content, list)
                         and len(msg_content) > 0
@@ -191,22 +193,14 @@ class OpenAIModel(Model):
                             }
                         ]
                         """
-                        tool_calls = ChatCompletionMessageToolCalls.from_json(
-                            msg.content
-                        )
-                        # logger.debug("msg has tool_calls")
-                        ccim = ChatCompletionInputMessage(
-                            role=str(OpenAIChatRole.TOOL_CALL.value),
-                            tool_calls=tool_calls._tool_calls,
-                        )
-                        # logger.debug(f"ccim: {ccim.to_json()}")
-                        input.append(ccim)
+                        tool_calls: List[ChatCompletionMessageToolCall] = msg_content
+                        ccim = {
+                            "role": str(OpenAIChatRole.TOOL_CALL.value),
+                            "tool_calls": tool_calls,
+                        }
                     else:
-                        input.append(
-                            ChatCompletionInputMessage(
-                                role=msg.role, content=msg.content
-                            )
-                        )
+                        ccim = {"role": msg.role, "content": msg.content}
+                    input.append(ccim)
                 elif msg.chat_role == ChatRole.TOOL_RESPONSE:
                     """
                     msg.content = {
@@ -217,36 +211,27 @@ class OpenAIModel(Model):
                         }
                     }
                     """
-                    tool_response = ChatCompletionInputMessageToolResponse.from_json(
-                        msg.content
-                    )
-                    input.append(
-                        ChatCompletionInputMessage(
-                            role=str(OpenAIChatRole.TOOL_RESPONSE.value),
-                            tool_call_id=tool_response.tool_call_id,
-                            name=tool_response.name,
-                            content=tool_response.content,
-                        )
-                    )
+                    tool_response: ChatCompletionToolMessageParam = {
+                        "content": msg_content["content"],
+                        "role": str(OpenAIChatRole.TOOL_RESPONSE.value),
+                        "tool_call_id": msg_content["tool_call_id"],
+                    }
+                    input.append(tool_response)
                 else:
-                    input.append(
-                        ChatCompletionInputMessage(role=msg.role, content=msg.content)
-                    )
+                    input.append({"role": msg.role, "content": msg.content})
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
             raise NotImplementedError("Code models are not yet supported.")
-        logger.debug(
-            f"input: {json.dumps([ccim.to_json() for ccim in input], indent=2)}"
-        )
+        logger.debug(f"input: {json.dumps(input, indent=2)}")
         return input
 
     def _standardize_response(
-        self, response: Union[str, ChatCompletionOutput]
+        self, response: Union[str, ChatCompletion]
     ) -> List[Notion]:
         output: List[Notion] = []
         if self.type == ModelType.CHAT:
-            r: ChatCompletionOutput = response
+            r: ChatCompletion = response
             for choice in r.choices:
                 msg = choice.message
                 # logger.debug(f"msg: {msg}")
@@ -254,18 +239,10 @@ class OpenAIModel(Model):
                     # logger.debug("msg has tool_calls")
                     output.append(
                         Notion(
-                            ChatCompletionMessageToolCalls(msg.tool_calls).to_json(),
+                            json.dumps(
+                                msg.model_dump(include="tool_calls")["tool_calls"]
+                            ),
                             str(ChatRole.TOOL_CALL.value),
-                        )
-                    )
-                elif hasattr(msg, "tool_call_id") and msg.tool_call_id is not None:
-                    # logger.debug("msg has tool_call_id")
-                    output.append(
-                        Notion(
-                            ChatCompletionInputMessageToolResponse(
-                                msg.tool_call_id, msg.name, msg.content
-                            ).to_json(),
-                            str(ChatRole.TOOL_RESPONSE.value),
                         )
                     )
                 else:
@@ -281,8 +258,8 @@ class OpenAIModel(Model):
 
     def _call(
         self,
-        input: Union[str, List[ChatCompletionInputMessage], List[str], List[List[int]]],
-        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        input: Union[str, List[ChatCompletionMessageParam], List[str], List[List[int]]],
+        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
         **kwargs,
     ):
         if input is None:
@@ -290,18 +267,19 @@ class OpenAIModel(Model):
 
         if self.type == ModelType.CHAT:
             if not isinstance(input, list):
-                raise ValueError("Input must be a list of ChatCompletionInputMessage.")
+                raise ValueError("Input must be a list of ChatCompletionMessageParam.")
 
-            inp = [msg.to_dict() for msg in input]
             if tool_choice is not None:
-                return self.model.create(
-                    **self.__chat_args,
-                    messages=inp,
+                return self.client.chat.completions.create(
+                    messages=input,
                     tool_choice=tool_choice,
+                    **self.__chat_args,
                     **kwargs,
                 )
             else:
-                return self.model.create(**self.__chat_args, messages=inp, **kwargs)
+                return self.client.chat.completions.create(
+                    messages=input, **self.__chat_args, **kwargs
+                )
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -309,8 +287,8 @@ class OpenAIModel(Model):
 
     async def _acall(
         self,
-        input: Union[str, List[ChatCompletionInputMessage], List[str], List[List[int]]],
-        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        input: Union[str, List[ChatCompletionMessageParam], List[str], List[List[int]]],
+        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
         **kwargs,
     ):
         if input is None:
@@ -318,29 +296,29 @@ class OpenAIModel(Model):
 
         if self.type == ModelType.CHAT:
             if input is not list:
-                raise ValueError("Input must be a list of ChatCompletionInputMessage.")
+                raise ValueError("Input must be a list of ChatCompletionMessageParam.")
 
             inp = [msg.to_dict() for msg in input]
             if tool_choice is not None:
-                return await self.model.create(
-                    **self.__chat_args,
+                return await self.client_async.chat.completions.create(
                     messages=inp,
                     tool_choice=tool_choice,
+                    **self.__chat_args,
                     **kwargs,
                 )
             else:
-                return await self.model.create(
-                    **self.__chat_args, messages=inp, **kwargs
+                return await self.client_async.chat.completions.create(
+                    messages=inp, tool_choice=tool_choice, **self.__chat_args, **kwargs
                 )
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
-        elif self.type == ModelType.CODE:
-            raise NotImplementedError("Code models are not yet supported.")
+        else:
+            raise NotImplementedError("Only chat and embedding models are supported.")
 
     def generate(
         self,
         messages: Union[Idearium, List[Notion]],
-        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
         **kwargs,
     ):
         if messages is None:
@@ -362,7 +340,7 @@ class OpenAIModel(Model):
     async def agenerate(
         self,
         messages: Union[Idearium, List[Notion]],
-        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
         **kwargs,
     ):
         if messages is None:
@@ -384,7 +362,7 @@ class OpenAIModel(Model):
     def stream(
         self,
         messages: Union[Idearium, List[Notion]],
-        tool_choice: Optional[ChatCompletionToolChoice] = None,
+        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
         **kwargs,
     ):
         if messages is None:
@@ -408,8 +386,7 @@ class OpenAIModel(Model):
     def __init__(
         self,
         name: str = "gpt-3.5-turbo",
-        tools: List[ChatCompletionInputTool] = None,
-        streaming: bool = False,
+        tools: List[ChatCompletionToolParam] = None,
         max_response: int = 256,
         api_key: str = "",
         top_p: float = 1.0,
@@ -419,10 +396,6 @@ class OpenAIModel(Model):
         presence_penalty: float = 0.0,
         frequency_penalty: float = 0.0,
         logit_bias: dict = None,
-        suffix: Optional[str] = None,
-        logprobs: Optional[int] = None,
-        echo: bool = False,
-        best_of: int = 1,
     ):
         """
         Creates an OpenAI model.
@@ -430,11 +403,8 @@ class OpenAIModel(Model):
         Args:
             name (str, optional): The name of the model version being used.
             Defaults to "gpt-3.5-turbo".
-            tools (List[ChatCompletionInputTool], optional): The tools to use.
+            tools (List[ChatCompletionToolParam], optional): The tools to use.
             Defaults to None.
-
-            streaming (bool, optional): Whether the model should be initialized as
-            streaming. Defaults to False.
             max_response (int, optional): The maximum number of tokens the model can
             return. Defaults to 256.
             api_key (str, optional): The API key for the model. Defaults to the
@@ -449,17 +419,10 @@ class OpenAIModel(Model):
             frequency_penalty (float, optional): The frequency penalty for the model.
             Defaults to 0.0.
             logit_bias (dict, optional): The logit bias for the model. Defaults to None.
-            suffix (str, optional): The suffix for the model. Defaults to None.
-            logprobs (int, optional): The number of logprobs for the model.
-            Defaults to None.
-            echo (bool, optional): Echo back the prompt in addition to the completion.
-            Defaults to False.
-            best_of (int, optional): Generates `best_of` completions server-side and
-            returns the "best" (the one with the lowest log probability per token).
-            Defaults to 1.
         """
         self._api_key = api_key or os.getenv("OPENAI_API_KEY")
-        openai.api_key = self.api_key
+        self.client = OpenAI(api_key=self.api_key)
+        self.client_async = AsyncOpenAI(api_key=self.api_key)
 
         if name is not None and name not in OpenAIModels:
             raise ValueError(f"Invalid OpenAI model name: {name}")
@@ -467,11 +430,13 @@ class OpenAIModel(Model):
 
         if self._name == "text-embedding-ada-002":
             self._can_stream = False
-            self._model = openai.Embedding
+            self._model = self.client.embeddings
+            self._model_async = self.client_async.embeddings
             self._type = ModelType.EMBEDDING
         elif self._name.lower().find("gpt") != -1:
             self._can_stream = True
-            self._model = openai.ChatCompletion
+            self._model = self.client.chat.completions
+            self._model_async = self.client_async.chat.completions
             self._type = ModelType.CHAT
         else:
             raise ValueError(
@@ -479,7 +444,6 @@ class OpenAIModel(Model):
                 + "Only chat and embedding models are supported."
             )
 
-        self._streaming = self._can_stream and streaming
         self._max_response = max_response
         if self.max_response == 0:
             self._max_response = self.max_tokens
@@ -492,12 +456,6 @@ class OpenAIModel(Model):
         self.presence_penalty = presence_penalty
         self.frequency_penalty = frequency_penalty
         self.logit_bias = logit_bias
-
-        # Text completion specific parameters
-        self.suffix = suffix
-        self.logprobs = logprobs
-        self.echo = echo
-        self.best_of = best_of
 
         # Chat completion specific parameters
         self.tools = tools

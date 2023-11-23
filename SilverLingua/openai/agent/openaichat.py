@@ -1,17 +1,19 @@
 import json
+import logging
 from typing import List, Optional
+
+from openai.types.chat import (
+    ChatCompletionMessageToolCall,
+    ChatCompletionToolMessageParam,
+    ChatCompletionToolParam,
+)
 
 from SilverLingua.core.agent import Agent
 from SilverLingua.core.atoms import Idearium, Notion, Tool
-from SilverLingua.core.atoms.tool.util import FunctionCall
 
 from ..atoms import OpenAIModel
-from ..atoms.model import ChatCompletionInputTool
-from ..atoms.model.util import (
-    ChatCompletionInputMessageToolResponse,
-    ChatCompletionMessageTool,
-    ChatCompletionMessageToolCalls,
-)
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIChatAgent(Agent):
@@ -26,8 +28,8 @@ class OpenAIChatAgent(Agent):
         return self._model
 
     def _bind_tools(self) -> None:
-        m_tools: List[ChatCompletionInputTool] = [
-            ChatCompletionInputTool(tool.description).to_dict() for tool in self.tools
+        m_tools: List[ChatCompletionToolParam] = [
+            {"type": "function", "function": tool.description} for tool in self.tools
         ]
 
         # Check to make sure m_tools is not empty
@@ -35,34 +37,62 @@ class OpenAIChatAgent(Agent):
             self._model.tools = m_tools
 
     def _use_tool(self, notion: Notion) -> List[Notion]:
-        responses: List[ChatCompletionInputMessageToolResponse] = []
+        responses: List[ChatCompletionToolMessageParam] = []
 
-        tool_calls = ChatCompletionMessageToolCalls.from_json(notion.content)
-        for tool_call in tool_calls._tool_calls:
-            t = ChatCompletionMessageTool(
-                tool_call["id"],
-                FunctionCall.from_json(json.dumps(tool_call["function"])),
-            )
-            tool = self._find_tool(t.function.name)
+        tool_calls: List[ChatCompletionMessageToolCall] = json.loads(notion.content)
+        if not isinstance(tool_calls, list):
+            raise ValueError("Notion content must be a list of tool calls")
+
+        for t in tool_calls:
+            tool = self._find_tool(t["function"]["name"])
             if tool is not None:
-                responses.append(
-                    ChatCompletionInputMessageToolResponse(
-                        t.id,
-                        t.function.name,
-                        tool(t.function),
+                args = None
+
+                # Try to parse the arguments as JSON
+                try:
+                    args = json.loads(t["function"]["arguments"])
+                except json.JSONDecodeError:
+                    logger.warning(
+                        "Invalid JSON in tool call arguments:"
+                        + f"{t['function']['arguments']}"
                     )
-                )
+
+                if args is not None:
+                    responses.append(
+                        {
+                            "tool_call_id": t["id"],
+                            "content": tool(**json.loads(t["function"]["arguments"])),
+                            "role": "tool",
+                        }
+                    )
+                else:
+                    # Tell the AI that the arguments were invalid
+                    responses.append(
+                        {
+                            "tool_call_id": t["id"],
+                            "content": "ERROR: Invalid arguments",
+                            "role": "tool",
+                        }
+                    )
             else:
                 responses.append(
-                    ChatCompletionInputMessageToolResponse(
-                        t.id,
-                        "error",
-                        "Tool not found",
-                    )
+                    {
+                        "tool_call_id": t["id"],
+                        "content": "Tool not found",
+                        "role": "tool",
+                    }
                 )
 
         return [
-            Notion(response.to_json(), str(self.role.TOOL_RESPONSE.value))
+            Notion(
+                json.dumps(
+                    {
+                        "tool_call_id": response["tool_call_id"],
+                        "content": response["content"],
+                    }
+                ),
+                str(self.role.TOOL_RESPONSE.value),
+            )
             for response in responses
         ]
 

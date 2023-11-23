@@ -87,17 +87,17 @@ class Model(ABC):
 
     @property
     @abstractmethod
-    def can_stream(self) -> bool:
+    def model_async(self) -> object:
         """
-        Whether the model can be streamed.
+        The asynchronous model itself.
         """
         pass
 
     @property
     @abstractmethod
-    def streaming(self) -> bool:
+    def can_stream(self) -> bool:
         """
-        Whether the model is initialized as streaming.
+        Whether the model can be streamed.
         """
         pass
 
