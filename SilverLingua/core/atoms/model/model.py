@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Union
+from typing import Any, Generator, List, Union
 
 from ..memory import Idearium, Notion
 from ..role import ChatRole
@@ -150,7 +150,7 @@ class Model(ABC):
 
     @abstractmethod
     def _standardize_response(
-        self, response: Union[object, str], *args, **kwargs
+        self, response: Union[object, str, List[any]], *args, **kwargs
     ) -> List[Notion]:
         """
         Standardizes the raw response from the model into a List of Notions.
@@ -170,7 +170,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def _call(self, input: Union[str, object], *args, **kwargs) -> object:
+    def _call(self, input: Union[str, object, List[any]], *args, **kwargs) -> object:
         """
         Calls the model with the given input and returns the raw response.
 
@@ -181,7 +181,9 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    async def _acall(self, input: Union[str, object], *args, **kwargs) -> object:
+    async def _acall(
+        self, input: Union[str, object, List[any]], *args, **kwargs
+    ) -> object:
         """
         Calls the model with the given input and returns the
         raw response asynchronously.
@@ -224,10 +226,22 @@ class Model(ABC):
     @abstractmethod
     def stream(
         self, messages: Union[Idearium, List[Notion]], *args, **kwargs
-    ) -> Notion:
+    ) -> Generator[Notion, Any, None]:
         """
         Streams the model with the given messages and returns the response,
         one token at a time.
+
+        If the model cannot be streamed, this will raise an exception.
+        """
+        pass
+
+    @abstractmethod
+    async def astream(
+        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+    ) -> Generator[Notion, Any, None]:
+        """
+        Streams the model with the given messages and returns the response,
+        one token at a time, asynchronously.
 
         If the model cannot be streamed, this will raise an exception.
         """

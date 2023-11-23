@@ -221,15 +221,14 @@ class Agent:
             tool_response = self._use_tool(response)
             # logger.debug(f"Tool response: {tool_response}")
             if isinstance(tool_response, list):
-                return await self.generate(tool_response)
+                return await self.agenerate(tool_response)
             else:
-                return await self.generate([self._use_tool(response)])
+                return await self.agenerate([self._use_tool(response)])
         else:
             return responses
 
-    def stream(self, messages: Union[Idearium, List[Notion]], **kwargs) -> Notion:
+    def stream(self, messages: Union[Idearium, List[Notion]], **kwargs):
         """
-        [NOT YET IMPLEMENTED]
         Streams a response to the given prompt by calling the
         underlying model's stream method and checking/actualizing tool usage.
 
@@ -240,7 +239,52 @@ class Agent:
             messages (Union[Idearium, List[Notion]]): The messages to respond to.
 
         Returns:
-            Notion: The model's response, one token at a time.
+            Generator[Notion, Any, None]: A generator of responses to the given
+                messages.
         """
-        logger.warn("Streaming is not yet supported.")
-        pass
+        self._idearium.extend(messages)
+        response = self._model.stream(self._idearium, **kwargs)
+
+        for r in response:
+            if r.chat_role == ChatRole.TOOL_CALL:
+                # Add the tool call to the idearium
+                self._idearium.append(r)
+                # Call stream again with the tool response
+                tool_response = self._use_tool(r)
+                if isinstance(tool_response, list):
+                    yield self.generate(tool_response)[0]
+                else:
+                    yield self.generate([self._use_tool(r)])[0]
+            else:
+                yield r
+
+    async def astream(self, messages: Union[Idearium, List[Notion]], **kwargs):
+        """
+        Asynchronously streams a response to the given prompt by calling the
+        underlying model's astream method and checking/actualizing tool usage.
+
+        NOTE: Will raise an exception if the underlying model does not support
+        streaming.
+
+        Args:
+            messages (Union[Idearium, List[Notion]]): The messages to respond to.
+
+        Returns:
+            Generator[Notion, Any, None]: A generator of responses to the given
+                messages.
+        """
+        self._idearium.extend(messages)
+        response = await self._model.astream(self._idearium, **kwargs)
+
+        for r in response:
+            if r.chat_role == ChatRole.TOOL_CALL:
+                # Add the tool call to the idearium
+                self._idearium.append(r)
+                # Call stream again with the tool response
+                tool_response = self._use_tool(r)
+                if isinstance(tool_response, list):
+                    yield self.generate(tool_response)[0]
+                else:
+                    yield self.generate([self._use_tool(r)])[0]
+            else:
+                yield r

@@ -1,10 +1,11 @@
 import json
 import logging
 import os
-from typing import List, Optional, Union
+from typing import Any, Coroutine, List, Optional, Union
 
 import tiktoken
 from openai import AsyncOpenAI, OpenAI
+from openai._streaming import AsyncStream, Stream
 from openai.resources import (
     AsyncCompletions,
     AsyncEmbeddings,
@@ -16,11 +17,15 @@ from openai.resources import (
 from openai.types.chat import (
     ChatCompletion,
     ChatCompletionAssistantMessageParam,
+    ChatCompletionChunk,
     ChatCompletionMessageParam,
     ChatCompletionMessageToolCall,
-    ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolMessageParam,
     ChatCompletionToolParam,
+)
+from openai.types.chat.completion_create_params import (
+    CompletionCreateParams,
+    CompletionCreateParamsNonStreaming,
 )
 
 from SilverLingua.core.atoms.memory import Idearium, Notion
@@ -227,26 +232,58 @@ class OpenAIModel(Model):
         return input
 
     def _standardize_response(
-        self, response: Union[str, ChatCompletion]
+        self, response: Union[str, ChatCompletion, ChatCompletionChunk]
     ) -> List[Notion]:
         output: List[Notion] = []
         if self.type == ModelType.CHAT:
-            r: ChatCompletion = response
-            for choice in r.choices:
-                msg = choice.message
-                # logger.debug(f"msg: {msg}")
-                if hasattr(msg, "tool_calls") and msg.tool_calls is not None:
-                    # logger.debug("msg has tool_calls")
-                    output.append(
-                        Notion(
-                            json.dumps(
-                                msg.model_dump(include="tool_calls")["tool_calls"]
-                            ),
-                            str(ChatRole.TOOL_CALL.value),
+            if (
+                hasattr(response.choices[0], "delta")
+                and response.choices[0].delta is not None
+            ):
+                # logger.debug("response is a chunk")
+                rc: ChatCompletionChunk = response
+                for choice in rc.choices:
+                    msg = choice.delta
+                    # logger.debug(f"msg: {msg}")
+                    if hasattr(msg, "tool_calls") and msg.tool_calls is not None:
+                        # logger.debug("msg has tool_calls")
+                        output.append(
+                            Notion(
+                                json.dumps(
+                                    msg.model_dump(include="tool_calls")["tool_calls"]
+                                ),
+                                str(ChatRole.TOOL_CALL.value),
+                            )
                         )
-                    )
-                else:
-                    output.append(Notion(msg.content, str(OpenAIChatRole.AI.value)))
+                    else:
+                        output.append(Notion(msg.content, str(OpenAIChatRole.AI.value)))
+            elif (
+                hasattr(response.choices[0], "message")
+                and response.choices[0].message is not None
+            ):
+                # logger.debug("response is not a chunk")
+                r: ChatCompletion = response
+                for choice in r.choices:
+                    msg = choice.message
+                    # logger.debug(f"msg: {msg}")
+                    if hasattr(msg, "tool_calls") and msg.tool_calls is not None:
+                        # logger.debug("msg has tool_calls")
+                        output.append(
+                            Notion(
+                                json.dumps(
+                                    msg.model_dump(include="tool_calls")["tool_calls"]
+                                ),
+                                str(ChatRole.TOOL_CALL.value),
+                            )
+                        )
+                    else:
+                        output.append(Notion(msg.content, str(OpenAIChatRole.AI.value)))
+            else:
+                raise ValueError(
+                    "Invalid response - has neither message nor delta"
+                    + "property set in choices."
+                    + f"\n response.choices[0]: {response.choices[0].model_dump_json()}"
+                )
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -258,10 +295,12 @@ class OpenAIModel(Model):
 
     def _call(
         self,
-        input: Union[str, List[ChatCompletionMessageParam], List[str], List[List[int]]],
-        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
-        **kwargs,
+        input: List[ChatCompletionMessageParam],
+        create_params: CompletionCreateParams = None,
     ):
+        if create_params is None:
+            create_params = {}
+
         if input is None:
             raise ValueError("No input provided.")
 
@@ -269,17 +308,15 @@ class OpenAIModel(Model):
             if not isinstance(input, list):
                 raise ValueError("Input must be a list of ChatCompletionMessageParam.")
 
-            if tool_choice is not None:
-                return self.client.chat.completions.create(
-                    messages=input,
-                    tool_choice=tool_choice,
-                    **self.__chat_args,
-                    **kwargs,
-                )
-            else:
-                return self.client.chat.completions.create(
-                    messages=input, **self.__chat_args, **kwargs
-                )
+            out: Union[
+                ChatCompletion, Stream[ChatCompletionChunk]
+            ] = self.client.chat.completions.create(
+                **self.__chat_args,
+                **create_params,
+                messages=input,
+            )
+
+            return out
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         elif self.type == ModelType.CODE:
@@ -287,29 +324,27 @@ class OpenAIModel(Model):
 
     async def _acall(
         self,
-        input: Union[str, List[ChatCompletionMessageParam], List[str], List[List[int]]],
-        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
-        **kwargs,
+        input: List[ChatCompletionMessageParam],
+        create_params: CompletionCreateParams = None,
     ):
+        if create_params is None:
+            create_params = {}
+
         if input is None:
             raise ValueError("No input provided.")
 
         if self.type == ModelType.CHAT:
-            if input is not list:
+            if not isinstance(input, list):
                 raise ValueError("Input must be a list of ChatCompletionMessageParam.")
 
-            inp = [msg.to_dict() for msg in input]
-            if tool_choice is not None:
-                return await self.client_async.chat.completions.create(
-                    messages=inp,
-                    tool_choice=tool_choice,
-                    **self.__chat_args,
-                    **kwargs,
-                )
-            else:
-                return await self.client_async.chat.completions.create(
-                    messages=inp, tool_choice=tool_choice, **self.__chat_args, **kwargs
-                )
+            out: Union[
+                Coroutine[Any, Any, ChatCompletion],
+                Coroutine[Any, Any, AsyncStream[ChatCompletionChunk]],
+            ] = self.client_async.chat.completions.create(
+                **self.__chat_args, **create_params, messages=input
+            )
+
+            return out
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
         else:
@@ -318,9 +353,11 @@ class OpenAIModel(Model):
     def generate(
         self,
         messages: Union[Idearium, List[Notion]],
-        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
-        **kwargs,
+        create_params: CompletionCreateParamsNonStreaming = None,
     ):
+        if create_params is None:
+            create_params = {}
+
         if messages is None:
             raise ValueError("No messages provided.")
 
@@ -331,18 +368,18 @@ class OpenAIModel(Model):
 
         input = self._format_request(self._preprocess(messages))
 
-        output = self._standardize_response(
-            self._call(input, tool_choice=tool_choice, **kwargs)
-        )
+        output = self._standardize_response(self._call(input, create_params))
 
         return self._postprocess(output)
 
     async def agenerate(
         self,
         messages: Union[Idearium, List[Notion]],
-        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
-        **kwargs,
+        create_params: CompletionCreateParamsNonStreaming = None,
     ):
+        if create_params is None:
+            create_params = {}
+
         if messages is None:
             raise ValueError("No messages provided.")
 
@@ -353,18 +390,18 @@ class OpenAIModel(Model):
 
         input = self._format_request(self._preprocess(messages))
 
-        output = self._standardize_response(
-            await self._acall(input, tool_choice=tool_choice, **kwargs)
-        )
+        output = self._standardize_response(await self._acall(input, create_params))
 
         return self._postprocess(output)
 
     def stream(
         self,
         messages: Union[Idearium, List[Notion]],
-        tool_choice: Optional[ChatCompletionToolChoiceOptionParam] = None,
-        **kwargs,
+        create_params: CompletionCreateParams = None,
     ):
+        if create_params is None:
+            create_params = {}
+
         if messages is None:
             raise ValueError("No messages provided.")
 
@@ -375,13 +412,43 @@ class OpenAIModel(Model):
 
         input = self._format_request(self._preprocess(messages))
 
-        output = self._standardize_response(
-            self._call(input, tool_choice=tool_choice, **kwargs)
+        output_stream: Stream[ChatCompletionChunk] = self._call(
+            input, {**create_params, "stream": True}
         )
 
-        # TODO: Implement streaming properly
+        for chunk in output_stream:
+            standardized_response = self._standardize_response(chunk)
 
-        return self._postprocess(output)
+            for notion in standardized_response:
+                yield notion
+
+    async def astream(
+        self,
+        messages: Union[Idearium, List[Notion]],
+        create_params: CompletionCreateParams = None,
+    ):
+        if create_params is None:
+            create_params = {}
+
+        if messages is None:
+            raise ValueError("No messages provided.")
+
+        # If messages is not an Idearium, convert it to one
+        # so we can take advantage of its automatic trimming.
+        if not isinstance(messages, Idearium):
+            messages = Idearium(self.tokenizer, self.max_tokens, messages)
+
+        input = self._format_request(self._preprocess(messages))
+
+        output_stream: AsyncStream[ChatCompletionChunk] = await self._acall(
+            input, {**create_params, "stream": True}
+        )
+
+        async for chunk in output_stream:
+            standardized_response = self._standardize_response(chunk)
+
+            for notion in standardized_response:
+                yield notion
 
     def __init__(
         self,
