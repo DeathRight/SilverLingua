@@ -1,9 +1,14 @@
-from typing import Callable, Iterator, List, TypedDict
+import logging
+from typing import Callable, Iterator, List
+
+from pydantic import BaseModel, ConfigDict, Field, root_validator
 
 from .notion import Notion
 
+logger = logging.getLogger(__name__)
 
-class Tokenizer(TypedDict):
+
+class Tokenizer(BaseModel):
     """
     A tokenizer that can encode and decode strings.
     """
@@ -12,34 +17,36 @@ class Tokenizer(TypedDict):
     decode: Callable[[List[int]], str]
 
 
-class Idearium:
+class Idearium(BaseModel):
     """
     A collection of `Notions` that is automatically trimmed to fit within a maximum
     number of tokens.
     """
 
-    _notions: List[Notion] = []
+    model_config = ConfigDict(frozen=True)
+    tokenizer: Tokenizer
+    max_tokens: int
+    notions: List[Notion] = Field(default_factory=list)
+    tokenized_notions: List[List[int]] = Field(default_factory=list)
+    persistent_indices: set = Field(default_factory=set)
 
-    def __init__(
-        self, tokenizer: Tokenizer, max_tokens: int, notions: List[Notion] = None
-    ):
-        """
-        Args:
-            tokenizer: A tokenizer that can encode and decode strings.
-            max_tokens: The maximum number of tokens the Idearium can contain.
-            notions: A list of notions to initialize the Idearium with. (Optional)
-        """
-        self.tokenizer = tokenizer
-        self.max_tokens = max_tokens
-        self._notions = []
-        self.tokenized_notions = []
-        self.persistent_indices = (
-            set()
-        )  # Keeping track of indices with persistent notions
+    @root_validator(pre=True)
+    def validate_notions(cls, values):
+        notions = values.get("notions", [])
+        for notion in notions:
+            cls.validate_notion(notion, values["max_tokens"], values["tokenizer"])
+        return values
 
-        if notions is not None:
-            for notion in notions:
-                self.add(notion)
+    @classmethod
+    def validate_notion(cls, notion: Notion, max_tokens: int, tokenizer: Tokenizer):
+        if len(notion.content) == 0:
+            raise ValueError("Notion content cannot be empty.")
+
+        tokenized_notion = tokenizer.encode(notion.content)
+        if len(tokenized_notion) > max_tokens:
+            raise ValueError("Notion exceeds maximum token length")
+
+        return tokenized_notion
 
     @property
     def total_tokens(self) -> int:
@@ -49,39 +56,33 @@ class Idearium:
     @property
     def _non_persistent_indices(self) -> set:
         """The indices of non-persistent notions."""
-        return set(range(len(self._notions))) - self.persistent_indices
+        return set(range(len(self.notions))) - self.persistent_indices
 
     def index(self, notion: Notion) -> int:
         """Returns the index of the first occurrence of the given notion."""
-        return self._notions.index(notion)
+        return self.notions.index(notion)
 
     def append(self, notion: Notion):
         """Appends the given notion to the end of the Idearium."""
         tokenized_notion = self.tokenizer.encode(notion.content)
 
-        if len(tokenized_notion) > self.max_tokens:
-            raise ValueError("Notion exceeds maximum token length")
-
-        # Check if this notion is a continuation of the previous notion
         if (
-            len(self._notions) > 0
-            and self._notions[-1].role == notion.role
-            and self._notions[-1].persistent == notion.persistent
+            self.notions
+            and self.notions[-1].role == notion.role
+            and self.notions[-1].persistent == notion.persistent
         ):
-            # Create a new notion with the combined content
-            # and replace the previous notion with it
-            combined_content = self._notions[-1].content + notion.content
+            combined_content = self.notions[-1].content + notion.content
             self.replace(
-                len(self._notions) - 1,
+                len(self.notions) - 1,
                 Notion(combined_content, notion.role, notion.persistent),
             )
             return
 
-        self._notions.append(notion)
+        self.notions.append(notion)
         self.tokenized_notions.append(tokenized_notion)
 
         if notion.persistent:
-            self.persistent_indices.add(len(self._notions) - 1)
+            self.persistent_indices.add(len(self.notions) - 1)
 
         self._trim()
 
@@ -92,12 +93,9 @@ class Idearium:
 
     def insert(self, index: int, notion: Notion):
         """Inserts the given notion at the given index."""
-        tokenized_notion = self.tokenizer["encode"](notion.content)
+        tokenized_notion = self.tokenizer.encode(notion.content)
 
-        if len(tokenized_notion) > self.max_tokens:
-            raise ValueError("Notion exceeds maximum token length")
-
-        self._notions.insert(index, notion)
+        self.notions.insert(index, notion)
         self.tokenized_notions.insert(index, tokenized_notion)
 
         # Update persistent_indices
@@ -116,7 +114,7 @@ class Idearium:
 
     def pop(self, index: int) -> Notion:
         """Removes and returns the notion at the given index."""
-        ret = self._notions.pop(index)
+        ret = self.notions.pop(index)
         self.tokenized_notions.pop(index)
 
         # Update persistent_indices
@@ -129,8 +127,8 @@ class Idearium:
 
     def replace(self, index: int, notion: Notion):
         """Replaces the notion at the given index with the given notion."""
-        self._notions[index] = notion
-        self.tokenized_notions[index] = self.tokenizer["encode"](notion.content)
+        self.notions[index] = notion
+        self.tokenized_notions[index] = self.tokenizer.encode(notion.content)
 
         # Update persistent_indices based on the replaced notion
         if notion.persistent:
@@ -142,7 +140,7 @@ class Idearium:
 
     def copy(self) -> "Idearium":
         """Returns a copy of the Idearium."""
-        return Idearium(self.tokenizer, self.max_tokens, self._notions.copy())
+        return Idearium(self.tokenizer, self.max_tokens, self.notions.copy())
 
     def _trim(self):
         """
@@ -164,7 +162,7 @@ class Idearium:
                 tokenized_notion = tokenized_notion[
                     : self.max_tokens - (self.total_tokens - len(tokenized_notion))
                 ]
-                self._notions[single_index].content = self.tokenizer["decode"](
+                self.notions[single_index].content = self.tokenizer["decode"](
                     tokenized_notion
                 )
                 return
@@ -182,10 +180,10 @@ class Idearium:
                 )
 
     def __len__(self) -> int:
-        return len(self._notions)
+        return len(self.notions)
 
     def __getitem__(self, index: int) -> Notion:
-        return self._notions[index]
+        return self.notions[index]
 
     def __setitem__(self, index: int, notion: Notion):
         self.replace(index, notion)
@@ -194,18 +192,18 @@ class Idearium:
         self.pop(index)
 
     def __iter__(self) -> Iterator[Notion]:
-        return iter(self._notions)
+        return iter(self.notions)
 
     def __contains__(self, notion: Notion) -> bool:
-        return notion in self._notions
+        return notion in self.notions
 
     def __str__(self) -> str:
-        return str(self._notions)
+        return str(self.notions)
 
     def __repr__(self) -> str:
-        return repr(self._notions)
+        return repr(self.notions)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Idearium):
             return NotImplemented
-        return self._notions == other._notions
+        return self.notions == other._notions

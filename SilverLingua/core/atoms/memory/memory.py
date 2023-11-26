@@ -1,4 +1,7 @@
-class Memory:
+from pydantic import BaseModel
+
+
+class Memory(BaseModel):
     """
     A Memory is the smallest unit of storage information, and
     is the base class for all other storage information.
@@ -6,16 +9,10 @@ class Memory:
 
     content: str
 
-    def __init__(self, content: str) -> None:
-        self.content = content
+    class Config:
+        # Configuring Pydantic's BaseModel behavior
+        anystr_strip_whitespace = True
+        min_anystr_length = 1
 
     def __str__(self) -> str:
         return self.content
-
-    def __repr__(self) -> str:
-        return f"Memory({self.content})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Memory):
-            return NotImplemented
-        return self.content == other.content

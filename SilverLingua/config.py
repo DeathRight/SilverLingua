@@ -2,13 +2,15 @@ import logging
 from enum import Enum
 from typing import List, Optional, Type
 
+from pydantic import BaseModel
+
 from .core.atoms.role import ChatRole, ReactRole
 from .core.atoms.tool import Tool
 
 logger = logging.getLogger(__name__)
 
 
-class Module:
+class Module(BaseModel):
     """
     A module that can be loaded into SilverLingua.
 
@@ -36,13 +38,17 @@ class Module:
         tools: List[Tool],
         chat_roles: List[ChatRole],
         react_roles: List[ReactRole],
-    ) -> None:
-        self.name = name
-        self.description = description
-        self.version = version
-        self.tools = tools
-        self.chat_roles = chat_roles
-        self.react_roles = react_roles
+        **kwargs,
+    ):
+        super().__init__(
+            name=name,
+            description=description,
+            version=version,
+            tools=tools,
+            chat_roles=chat_roles,
+            react_roles=react_roles,
+            **kwargs,
+        )
 
         Config.register_module(self)
 

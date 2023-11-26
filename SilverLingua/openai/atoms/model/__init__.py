@@ -1,5 +1,2 @@
 from .openai import OpenAIModel
-from .util import (
-    OpenAIChatModels,
-    OpenAIModels,
-)
+from .util import OpenAIChatModels, OpenAIModels, OpenAIModelParams

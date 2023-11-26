@@ -1,2 +1,8 @@
 from .tool import Tool
-from .util import FunctionCall, FunctionJSONSchema, FunctionResponse
+from .util import (
+    FunctionJSONSchema,
+    ToolCall,
+    ToolCalls,
+    ToolCallResponse,
+    ToolCallFunction,
+)

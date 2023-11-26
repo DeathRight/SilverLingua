@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Generator, List, Union
 
-from ..memory import Idearium, Notion
+from pydantic import BaseModel, ConfigDict, Field
+
+from ..memory import Idearium, Notion, Tokenizer
 from ..role import ChatRole
 
 
@@ -12,7 +14,7 @@ class ModelType(Enum):
     CODE = 2
 
 
-class Model(ABC):
+class Model(BaseModel, ABC):
     """
     Abstract class for all Large Language Models.
 
@@ -45,85 +47,24 @@ class Model(ABC):
     with the specific requirements and behaviors of the target LLM.
     """
 
-    @property
-    @abstractmethod
-    def role(self) -> ChatRole:
-        """
-        The ChatRole object for the model.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def api_key(self) -> str:
-        """
-        The API key for the model.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """
-        The name of the model version being used.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def type(self) -> ModelType:
-        """
-        The type of model being used.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def model(self) -> object:
-        """
-        The model itself.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def model_async(self) -> object:
-        """
-        The asynchronous model itself.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def can_stream(self) -> bool:
-        """
-        Whether the model can be streamed.
-        """
-        pass
+    model_config = ConfigDict(frozen=True)
+    #
+    max_response: int = Field(default=0)
+    api_key: str
+    name: str
+    #
+    _role: ChatRole
+    _type: ModelType
+    _model: object
+    _model_async: object
+    _can_stream: bool
+    _tokenizer: Tokenizer
 
     @property
     @abstractmethod
     def max_tokens(self) -> int:
         """
-        The maximum number of tokens the model can handle.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def max_response(self) -> int:
-        """
-        The maximum number of tokens the model can return.
-
-        If 0, there is no limit.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def tokenizer(self) -> object:
-        """
-        The tokenizer for the model.
+        The maximum number of tokens that can be fed to the model at once.
         """
         pass
 
@@ -244,12 +185,5 @@ class Model(ABC):
         one token at a time, asynchronously.
 
         If the model cannot be streamed, this will raise an exception.
-        """
-        pass
-
-    @abstractmethod
-    def __init__(self, max_response: int = 0, **kwargs):
-        """
-        Initializes the model.
         """
         pass

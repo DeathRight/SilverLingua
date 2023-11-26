@@ -37,7 +37,7 @@ def roll_dice(
     Rolls a number of dice with a given number of sides, optionally with a modifier and/or advantage/disadvantage. Returns `{result: int, rolls: int[]}`
 
     Args:
-        sides: The number of sides on each die
+        sides: The number of sides on each die (default 20)
         dice: The number of dice to roll (default 1)
         modifier: The modifier to add to the roll total (default 0)
         advantage: Whether to roll with advantage (default False)
@@ -72,8 +72,25 @@ load_dotenv()
 agent = OpenAIChatAgent()  # ("gpt-4-1106-preview")
 agent.add_tool(rd_tool)
 
+print("About to start chat stream...")
+stream = agent.stream(
+    [
+        Notion(
+            "roll 1d20",
+            str(OpenAIChatRole.HUMAN.value),
+        )
+    ]
+)
+for notion in stream:
+    agent.idearium.append(notion)
+    print(agent.idearium[-1])
+
+r = agent.generate([Notion(":)", str(OpenAIChatRole.HUMAN.value))])
+agent.idearium.append(r[0])
+print(r[0])
+
 # Start command line chat with agent
-try:
+"""try:
     while True:
         message = input("You: ")
 
@@ -84,4 +101,4 @@ try:
         agent.idearium.append(response[0])
         print(response[0])
 finally:
-    print("Chat session ended.")
+    print("Chat session ended.")"""

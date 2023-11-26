@@ -1,10 +1,16 @@
 import json
 from typing import Callable
 
-from .util import FunctionCall, FunctionJSONSchema, generate_function_json
+from pydantic import BaseModel, Field, field_validator
+
+from .util import (
+    FunctionJSONSchema,
+    ToolCallFunction,
+    generate_function_json,
+)
 
 
-class Tool:
+class Tool(BaseModel):
     """
     A wrapper class for functions that allows them to be both directly callable
     and serializable to JSON for use with an LLM.
@@ -30,7 +36,7 @@ class Tool:
         serialized = str(tool_instance)
         ```
 
-    Alternatively, you can call the function using a FunctionCall object.
+    Alternatively, you can call the function using a ToolCallFunction object.
         ```python
         # Create a FunctionCall object
         function_call = FunctionCall("my_function", {"x": 1, "y": 2})
@@ -41,33 +47,38 @@ class Tool:
     """
 
     function: Callable
-    description: FunctionJSONSchema
-    name: str
+    description: FunctionJSONSchema = Field(validate_default=True)
+    name: str = Field(validate_default=True)
 
-    def __init__(self, function: Callable):
-        self.function = function
-        self.description = generate_function_json(function)
-        self.name = self.description["name"]
+    @field_validator("description", mode="before")
+    def set_default_description(cls, v, values):
+        return generate_function_json(values["function"])
 
-    def to_json(self):
-        return json.dumps(self.description)
+    @field_validator("name", mode="before")
+    def set_default_name(cls, v, values):
+        return values["description"]["name"]
 
-    def use_function_call(self, function_call: FunctionCall):
+    def use_function_call(self, function_call: ToolCallFunction):
         """
         Uses a FunctionCall to call the function.
         """
         arguments_dict = function_call.arguments
-        if isinstance(function_call.arguments, str):
-            try:
-                arguments_dict = json.loads(function_call.arguments)
-            except json.JSONDecodeError:
-                raise ValueError(
-                    "FunctionCall.arguments must be a JSON string or a dict."
-                ) from None
+        if arguments_dict == "":
+            return json.dumps(self.function())
+
+        try:
+            arguments_dict = json.loads(function_call.arguments)
+        except json.JSONDecodeError:
+            raise ValueError(
+                "ToolCall.arguments must be a JSON string.\n"
+                + f"function_call.arguments: {function_call.arguments}\n"
+                + f"json.loads result: {arguments_dict}"
+            ) from None
+
         return json.dumps(self.function(**arguments_dict))
 
     def __call__(self, *args, **kwargs):
-        if len(args) == 1 and isinstance(args[0], FunctionCall):
+        if len(args) == 1 and isinstance(args[0], ToolCallFunction):
             return self.use_function_call(args[0])
         return json.dumps(self.function(*args, **kwargs))
 

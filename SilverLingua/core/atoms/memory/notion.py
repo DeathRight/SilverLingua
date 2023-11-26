@@ -1,4 +1,6 @@
-from typing import Any
+from typing import Union
+
+from pydantic import validator
 
 from ..role import ChatRole, ReactRole
 from .memory import Memory
@@ -7,7 +9,6 @@ from .memory import Memory
 class Notion(Memory):
     """
     A memory that stores the role associated with its content.
-
     The role is usually a `ChatRole` or a `ReactRole`.
     (See `atoms/roles`)
 
@@ -20,32 +21,19 @@ class Notion(Memory):
     role: str
     persistent: bool = False
 
-    def __init__(self, content: str, role: Any, persistent: bool = False) -> None:
-        super().__init__(content)
+    @validator("role", pre=True, always=True)
+    def validate_role(cls, v: Union[ChatRole, ReactRole, str]):
+        if isinstance(v, (ChatRole, ReactRole)):
+            return v.value
+        elif isinstance(v, str):
+            return v
+        raise TypeError(f"Expected a ChatRole, ReactRole, or a string, got {type(v)}")
 
-        if hasattr(role, "name") and hasattr(role, "value"):
-            self.role = role.value
-        elif isinstance(role, str):
-            self.role = role
-        else:
-            raise TypeError(f"Expected an enum member or a string, got {type(role)}")
-
-        self.persistent = persistent
+    class Config:
+        orm_mode = True
 
     def __str__(self) -> str:
         return f"{self.role}: {self.content}"
-
-    def __repr__(self) -> str:
-        return f"Notion({self.content}, {self.role}, {self.persistent})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Notion):
-            return NotImplemented
-        return (
-            self.content == other.content
-            and self.role == other.role
-            and self.persistent == other.persistent
-        )
 
     @property
     def chat_role(self) -> ChatRole:
