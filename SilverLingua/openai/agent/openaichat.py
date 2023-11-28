@@ -32,7 +32,7 @@ class OpenAIChatAgent(Agent):
 
         # Check to make sure m_tools is not empty
         if len(m_tools) > 0:
-            self.model.tools = m_tools
+            self.model.completion_params.tools = m_tools
 
     def __init__(
         self,
@@ -41,7 +41,7 @@ class OpenAIChatAgent(Agent):
         tools: Optional[List[Tool]] = None,
         api_key: Optional[str] = None,
         completion_params: Optional[CompletionParams] = None,
-    ) -> None:
+    ):
         """
         Initializes the OpenAI chat agent.
 
@@ -57,8 +57,15 @@ class OpenAIChatAgent(Agent):
             completion_params (CompletionParams, optional): The completion parameters
             to use.
         """
-        self.model = OpenAIModel(
+        model = OpenAIModel(
             name=model_name, api_key=api_key, completion_params=completion_params
         )
+        print(f"Testing 2: Tokenizer: {model.tokenizer}")
 
-        super().__init__(model=self.model, idearium=idearium, tools=tools)
+        args = {"model": model}
+        if idearium is not None:
+            args["idearium"] = idearium
+        if tools is not None:
+            args["tools"] = tools
+
+        super().__init__(**args)

@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Any, Coroutine, List, Optional, Union
 
+import tiktoken
 from openai import AsyncOpenAI, OpenAI
 from openai._streaming import AsyncStream, Stream
 from openai.resources import (
@@ -25,9 +26,10 @@ from openai.types.chat.completion_create_params import (
     CompletionCreateParams,
     CompletionCreateParamsNonStreaming,
 )
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from SilverLingua.core.atoms.memory import Idearium, Notion
+from SilverLingua.core.atoms.memory.idearium import Tokenizer
 from SilverLingua.core.atoms.model import Model, ModelType
 from SilverLingua.core.atoms.role import ChatRole
 
@@ -42,6 +44,8 @@ class OpenAIModel(Model):
     An OpenAI model.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     # init parameters
     name: OpenAIModelName
     # Completion parameters
@@ -51,26 +55,26 @@ class OpenAIModel(Model):
     )
 
     # OpenAI clients
-    _client: OpenAI
-    _client_async: AsyncOpenAI
+    client: OpenAI
+    client_async: AsyncOpenAI
     # Model parameters
-    _role = OpenAIChatRole
-    _model: Completions | Embeddings
-    _model_async: AsyncCompletions | AsyncEmbeddings
+    role: OpenAIChatRole = OpenAIChatRole
+    llm: Completions | Embeddings
+    llm_async: AsyncCompletions | AsyncEmbeddings
 
     @property
     def moderation(self) -> Moderations:
         """
         The moderation object used to check if text violates OpenAI's content policy.
         """
-        return self._client.moderations
+        return self.client.moderations
 
     @property
     def moderation_async(self) -> AsyncModerations:
         """
         The moderation object used to check if text violates OpenAI's content policy.
         """
-        return self._client_async.moderations
+        return self.client_async.moderations
 
     @property
     def max_tokens(self) -> int:
@@ -83,16 +87,19 @@ class OpenAIModel(Model):
         """
         Boilerplate arguments for the OpenAI chat completion API to be unpacked.
         """
-        return self.completion_params.model_dump()
+        return {
+            **self.completion_params.model_dump(exclude_none=True),
+            "model": self.name,
+        }
 
     def _preprocess(self, messages: List[Notion]):
         msgs: List[Notion] = []
         for msg in messages:
             msgs.append(
                 Notion(
-                    msg.content,
-                    str(OpenAIChatRole[msg.chat_role.name].value),
-                    msg.persistent,
+                    content=msg.content,
+                    role=str(OpenAIChatRole[msg.chat_role.name].value),
+                    persistent=msg.persistent,
                 )
             )
         return msgs
@@ -198,15 +205,17 @@ class OpenAIModel(Model):
                         # logger.debug("msg has tool_calls")
                         output.append(
                             Notion(
-                                json.dumps(
+                                content=json.dumps(
                                     msg.model_dump(include="tool_calls")["tool_calls"]
                                 ),
-                                str(ChatRole.TOOL_CALL.value),
+                                role=str(ChatRole.TOOL_CALL.value),
                             )
                         )
                     else:
                         if msg.content is not None:
-                            output.append(Notion(msg.content, str(ChatRole.AI.value)))
+                            output.append(
+                                Notion(content=msg.content, role=str(ChatRole.AI.value))
+                            )
             elif (
                 hasattr(response.choices[0], "message")
                 and response.choices[0].message is not None
@@ -220,20 +229,23 @@ class OpenAIModel(Model):
                         # logger.debug("msg has tool_calls")
                         output.append(
                             Notion(
-                                json.dumps(
+                                content=json.dumps(
                                     msg.model_dump(include="tool_calls")["tool_calls"]
                                 ),
-                                str(ChatRole.TOOL_CALL.value),
+                                role=str(ChatRole.TOOL_CALL.value),
                             )
                         )
                     else:
                         if msg.content is not None:
-                            output.append(Notion(msg.content, str(ChatRole.AI.value)))
+                            output.append(
+                                Notion(content=msg.content, role=str(ChatRole.AI.value))
+                            )
             else:
                 raise ValueError(
                     "Invalid response - has neither message nor delta"
                     + "property set in choices."
-                    + f"\n response.choices[0]: {response.choices[0].model_dump_json()}"
+                    + "\n response.choices[0]: "
+                    + "{response.choices[0].model_dump_json(exclude_none=True)}"
                 )
         elif self.type == ModelType.EMBEDDING:
             raise NotImplementedError("Embedding models are not yet supported.")
@@ -248,6 +260,7 @@ class OpenAIModel(Model):
         self,
         input: List[ChatCompletionMessageParam],
         create_params: CompletionCreateParams = None,
+        retries: int = 0,
     ):
         if create_params is None:
             create_params = {}
@@ -261,13 +274,16 @@ class OpenAIModel(Model):
 
             out: Union[ChatCompletion, Stream[ChatCompletionChunk]]
             try:
-                out = self._client.chat.completions.create(
+                out = self.client.chat.completions.create(
                     **self.__chat_args,
                     **create_params,
                     messages=input,
                 )
             except Exception as e:
                 logger.error(f"Error calling OpenAI chat completion API: {e}")
+                if retries >= 3:
+                    raise e
+
                 inp = input.copy()
                 # Remove everything since the last user message
                 for i in range(len(inp) - 1, -1, -1):
@@ -283,7 +299,8 @@ class OpenAIModel(Model):
                     }
                 )
                 # Try again
-                out = self._call(inp, create_params)
+                retries += 1
+                out = self._call(inp, create_params, retries)
 
             return out
         elif self.type == ModelType.EMBEDDING:
@@ -314,7 +331,7 @@ class OpenAIModel(Model):
                 out: Union[
                     Coroutine[Any, Any, ChatCompletion],
                     Coroutine[Any, Any, AsyncStream[ChatCompletionChunk]],
-                ] = self._client_async.chat.completions.create(
+                ] = self.client_async.chat.completions.create(
                     **self.__chat_args, **create_params, messages=input
                 )
             except Exception as e:
@@ -460,34 +477,47 @@ class OpenAIModel(Model):
                 the OpenAI completions API.
                 If None, default values will be used.
         """
-        args = {}
-        args.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if args.api_key is None:
+        completion_params = completion_params or CompletionParams()
+        tokenizer = tiktoken.encoding_for_model(name)
+        args = {
+            "name": name,
+            "api_key": api_key or os.getenv("OPENAI_API_KEY"),
+            "completion_params": completion_params,
+            "client": None,
+            "client_async": None,
+            "llm": None,
+            "llm_async": None,
+            "can_stream": None,
+            "type": None,
+            "tokenizer": Tokenizer(encode=tokenizer.encode, decode=tokenizer.decode),
+        }
+
+        if args["api_key"] is None:
             raise ValueError(
                 "No OpenAI API key provided and "
                 + "`OPENAI_API_KEY` not set as an environment variable."
             )
-        args.name = name
-        args.max_response = completion_params.max_tokens
-        args.completion_params = completion_params
 
-        args._client = OpenAI(api_key=args.api_key)
-        args._client_async = AsyncOpenAI(api_key=args.api_key)
+        if completion_params.max_tokens is not None:
+            args["max_response"] = completion_params.max_tokens
 
-        if args.name == "text-embedding-ada-002":
-            args._can_stream = False
-            args._model = args._client.embeddings
-            args._model_async = args._client_async.embeddings
-            args._type = ModelType.EMBEDDING
-        elif args.name.lower().find("gpt") != -1:
-            args._can_stream = True
-            args._model = args._client.chat.completions
-            args._model_async = args._client_async.chat.completions
-            args._type = ModelType.CHAT
+        args["client"] = OpenAI(api_key=args["api_key"])
+        args["client_async"] = AsyncOpenAI(api_key=args["api_key"])
+
+        if args["name"] == "text-embedding-ada-002":
+            args["can_stream"] = False
+            args["llm"] = args["client"].embeddings
+            args["llm_async"] = args["client_async"].embeddings
+            args["type"] = ModelType.EMBEDDING
+        elif args["name"].lower().find("gpt") != -1:
+            args["can_stream"] = True
+            args["llm"] = args["client"].embeddings
+            args["llm_async"] = args["client_async"].embeddings
+            args["type"] = ModelType.CHAT
         else:
             raise ValueError(
-                f"Invalid OpenAI model name: {args.name}.\n"
+                f"Invalid OpenAI model name: {args['name']}.\n"
                 + "Only chat and embedding models are supported."
             )
-
+        logger.debug(f"TESTING. Tokenizer: {args['tokenizer']}")
         super().__init__(**args)

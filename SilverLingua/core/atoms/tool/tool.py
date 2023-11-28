@@ -1,7 +1,7 @@
 import json
 from typing import Callable
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from .util import (
     FunctionJSONSchema,
@@ -50,14 +50,6 @@ class Tool(BaseModel):
     description: FunctionJSONSchema = Field(validate_default=True)
     name: str = Field(validate_default=True)
 
-    @field_validator("description", mode="before")
-    def set_default_description(cls, v, values):
-        return generate_function_json(values["function"])
-
-    @field_validator("name", mode="before")
-    def set_default_name(cls, v, values):
-        return values["description"]["name"]
-
     def use_function_call(self, function_call: ToolCallFunction):
         """
         Uses a FunctionCall to call the function.
@@ -84,3 +76,14 @@ class Tool(BaseModel):
 
     def __str__(self):
         return self.to_json()
+
+    def __init__(self, function: Callable):
+        """
+        Creates a new Tool instance from the given function.
+
+        Args:
+            function (Callable): The function to be turned into a Tool.
+        """
+        description = generate_function_json(function)
+        name = description.name
+        super().__init__(function=function, description=description, name=name)

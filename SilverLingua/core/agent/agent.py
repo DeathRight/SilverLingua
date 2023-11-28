@@ -3,7 +3,7 @@ import json
 import logging
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict
 
 from ..atoms import ChatRole, Idearium, Model, Notion, Tool
 from ..atoms.tool import (
@@ -30,13 +30,13 @@ class Agent(BaseModel):
     model_config = ConfigDict(frozen=True)
     #
     model: Model
-    idearium: Idearium = Field(validate_default=True)
+    idearium: Idearium
     """
     The Idearium used by the agent.
 
     WARNING: Do not modify this list directly.
     """
-    tools: List[Tool] = Field(default_factory=list)
+    tools: List[Tool]
     """
     The tools used by the agent.
 
@@ -44,13 +44,27 @@ class Agent(BaseModel):
     and `remove_tool` instead.
     """
 
-    @field_validator("idearium", mode="before")
-    def set_default_idearium(cls, v, values):
-        if v is None:
-            model = values.get("model")
-            if model is not None:
-                return Idearium(tokenizer=model.tokenizer, max_tokens=model.max_tokens)
-        return v
+    def __init__(
+        self,
+        model: Model,
+        idearium: Optional[Idearium] = None,
+        tools: Optional[List[Tool]] = None,
+    ):
+        """
+        Initializes the agent.
+
+        Args:
+            model (Model): The model to use.
+            idearium (Idearium, optional): The idearium to use.
+                If None, a new one will be created.
+            tools (List[Tool], optional): The tools to use.
+        """
+        super().__init__(
+            model=model,
+            idearium=idearium
+            or Idearium(tokenizer=model.tokenizer, max_tokens=model.max_tokens),
+            tools=tools or [],
+        )
 
     def model_post_init(self, __content):
         self._bind_tools()
@@ -99,25 +113,25 @@ class Agent(BaseModel):
                     tc_function_response = json.loads(tool_call.function.arguments)
 
                 tc_response = ToolCallResponse.from_tool_call(
-                    tool_call, tool(**tc_function_response)
+                    tool_call=tool_call, response=tool(**tc_function_response)
                 )
                 responses.append(
                     Notion(
-                        tc_response.model_dump_json(),
-                        str(self.role.TOOL_RESPONSE.value),
+                        content=tc_response.model_dump_json(exclude_none=True),
+                        role=str(self.role.TOOL_RESPONSE.value),
                     )
                 )
             else:
                 responses.append(
                     Notion(
-                        json.dumps(
+                        content=json.dumps(
                             {
                                 "tool_call_id": tool_call.id,
                                 "content": "Tool not found",
                                 "name": "error",
                             }
                         ),
-                        str(self.role.TOOL_RESPONSE.value),
+                        role=str(self.role.TOOL_RESPONSE.value),
                     )
                 )
         return responses
@@ -192,7 +206,10 @@ class Agent(BaseModel):
             # Add the tool call to the idearium
             self.idearium.append(response)
             # Call generate again with the tool response
-            tool_response = self._use_tools(response)
+            tool_calls = ToolCalls.model_validate_json(
+                '{"list": ' + response.content + "}"
+            )
+            tool_response = self._use_tools(tool_calls)
             # logger.debug(f"Tool response: {tool_response}")
             return self.generate(tool_response)
         else:
@@ -251,9 +268,7 @@ class Agent(BaseModel):
             if r.chat_role == ChatRole.TOOL_CALL:
                 logger.debug(f"Tool call detected: {r.content}")
 
-                tc_chunks = ToolCalls.model_validate_json(
-                    '{"tool_calls": ' + r.content + "}"
-                )
+                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
                 tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
                 continue
             elif r.content is not None:
@@ -268,11 +283,14 @@ class Agent(BaseModel):
                 if not tool_call.id.startswith("call_"):
                     # Something went wrong and this tool call is not valid
                     tool_calls.list.pop(i)
-                    logger.error(f"Invalid tool call: {tool_call.model_dump_json()}")
+                    logger.error(
+                        "Invalid tool call: "
+                        + "{tool_call.model_dump_json(exclude_none=True)}"
+                    )
 
             tc_notion = Notion(
-                content=json.dumps(tool_calls.model_dump().list),
-                chat_role=str(ChatRole.TOOL_CALL.value),
+                content=json.dumps(tool_calls.model_dump(exclude_none=True).list),
+                role=str(ChatRole.TOOL_CALL.value),
             )
 
             # Add the tool call to the idearium
@@ -310,9 +328,7 @@ class Agent(BaseModel):
             if r.chat_role == ChatRole.TOOL_CALL:
                 logger.debug(f"Tool call detected: {r.content}")
 
-                tc_chunks = ToolCalls.model_validate_json(
-                    '{"tool_calls": ' + r.content + "}"
-                )
+                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
                 tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
                 continue
             elif r.content is not None:
@@ -327,11 +343,14 @@ class Agent(BaseModel):
                 if not tool_call.id.startswith("call_"):
                     # Something went wrong and this tool call is not valid
                     tool_calls.list.pop(i)
-                    logger.error(f"Invalid tool call: {tool_call.model_dump_json()}")
+                    logger.error(
+                        "Invalid tool call: "
+                        + "{tool_call.model_dump_json(exclude_none=True)}"
+                    )
 
             tc_notion = Notion(
-                content=json.dumps(tool_calls.model_dump().list),
-                chat_role=str(ChatRole.TOOL_CALL.value),
+                content=json.dumps(tool_calls.model_dump(exclude_none=True).list),
+                role=str(ChatRole.TOOL_CALL.value),
             )
 
             # Add the tool call to the idearium

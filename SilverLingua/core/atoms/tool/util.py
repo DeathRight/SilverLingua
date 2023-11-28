@@ -11,9 +11,9 @@ class ToolCallResponse(BaseModel):
     The response property of a tool call.
     """
 
-    tool_call_id: str = Field(alias="id")
+    tool_call_id: str
     name: str
-    content: str = Field(alias="response")
+    content: str
 
     @classmethod
     def from_tool_call(cls, tool_call: "ToolCall", response: str) -> "ToolCallResponse":

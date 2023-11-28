@@ -1,6 +1,6 @@
 from typing import Union
 
-from pydantic import validator
+from pydantic import ConfigDict, validator
 
 from ..role import ChatRole, ReactRole
 from .memory import Memory
@@ -18,6 +18,7 @@ class Notion(Memory):
         persistent: Whether the notion should be stored in long-term memory.
     """
 
+    model_config = ConfigDict(from_attributes=True)
     role: str
     persistent: bool = False
 
@@ -28,9 +29,6 @@ class Notion(Memory):
         elif isinstance(v, str):
             return v
         raise TypeError(f"Expected a ChatRole, ReactRole, or a string, got {type(v)}")
-
-    class Config:
-        orm_mode = True
 
     def __str__(self) -> str:
         return f"{self.role}: {self.content}"

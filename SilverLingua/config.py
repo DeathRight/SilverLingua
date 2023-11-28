@@ -2,7 +2,7 @@ import logging
 from enum import Enum
 from typing import List, Optional, Type
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from .core.atoms.role import ChatRole, ReactRole
 from .core.atoms.tool import Tool
@@ -27,8 +27,36 @@ class Module(BaseModel):
     description: str
     version: str
     tools: List[Tool]
-    chat_roles: List[ChatRole]
-    react_roles: List[ReactRole]
+    chat_roles: List[type[ChatRole]]
+    react_roles: List[type[ReactRole]]
+
+    @field_validator("chat_roles", mode="plain")
+    def check_chat_roles(cls, v):
+        for role in v:
+            if not issubclass(role, Enum):
+                raise TypeError("Expected an enum")
+            else:
+                for member in role:
+                    if (
+                        not ChatRole[member.name]
+                        or member.value != ChatRole[member.name].value
+                    ):
+                        raise TypeError("members must match ChatRole members.")
+        return v
+
+    @field_validator("react_roles", mode="plain")
+    def check_react_roles(cls, v):
+        for role in v:
+            if not issubclass(role, Enum):
+                raise TypeError("Expected an enum")
+            else:
+                for member in role:
+                    if (
+                        not ReactRole[member.name]
+                        or member.value != ReactRole[member.name].value
+                    ):
+                        raise TypeError("members must match ReactRole members.")
+        return v
 
     def __init__(
         self,
@@ -36,8 +64,8 @@ class Module(BaseModel):
         description: str,
         version: str,
         tools: List[Tool],
-        chat_roles: List[ChatRole],
-        react_roles: List[ReactRole],
+        chat_roles: List[type[ChatRole]],
+        react_roles: List[type[ReactRole]],
         **kwargs,
     ):
         super().__init__(
@@ -55,8 +83,8 @@ class Module(BaseModel):
 
 class Config:
     modules: List[Module] = []
-    chat_roles: List[ChatRole] = [ChatRole]
-    react_roles: List[ReactRole] = [ReactRole]
+    chat_roles: List[type[ChatRole]] = [ChatRole]
+    react_roles: List[type[ReactRole]] = [ReactRole]
     tools: List[Tool] = []
 
     @classmethod

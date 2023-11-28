@@ -72,6 +72,7 @@ load_dotenv()
 agent = OpenAIChatAgent()  # ("gpt-4-1106-preview")
 agent.add_tool(rd_tool)
 
+"""
 print("About to start chat stream...")
 stream = agent.stream(
     [
@@ -85,20 +86,23 @@ for notion in stream:
     agent.idearium.append(notion)
     print(agent.idearium[-1])
 
-r = agent.generate([Notion(":)", str(OpenAIChatRole.HUMAN.value))])
+r = agent.generate([Notion(content=":)", role=str(OpenAIChatRole.HUMAN.value))])
 agent.idearium.append(r[0])
 print(r[0])
+"""
 
 # Start command line chat with agent
-"""try:
+try:
     while True:
         message = input("You: ")
 
         if message == "exit":
             break
 
-        response = agent.generate([Notion(message, str(OpenAIChatRole.HUMAN.value))])
+        response = agent.generate(
+            [Notion(content=message, role=str(OpenAIChatRole.HUMAN.value))]
+        )
         agent.idearium.append(response[0])
         print(response[0])
 finally:
-    print("Chat session ended.")"""
+    print("Chat session ended.")

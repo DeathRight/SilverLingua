@@ -1,1 +1,1 @@
-from .chat import OpenAIChatRole
+from .chat import OpenAIChatRole  # noqa

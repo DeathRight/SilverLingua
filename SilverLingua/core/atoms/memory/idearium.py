@@ -1,7 +1,7 @@
 import logging
 from typing import Callable, Iterator, List
 
-from pydantic import BaseModel, ConfigDict, Field, root_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .notion import Notion
 
@@ -30,11 +30,11 @@ class Idearium(BaseModel):
     tokenized_notions: List[List[int]] = Field(default_factory=list)
     persistent_indices: set = Field(default_factory=set)
 
-    @root_validator(pre=True)
+    @model_validator(mode="after")
     def validate_notions(cls, values):
-        notions = values.get("notions", [])
+        notions = values.notions
         for notion in notions:
-            cls.validate_notion(notion, values["max_tokens"], values["tokenizer"])
+            cls.validate_notion(notion, values.max_tokens, values.tokenizer)
         return values
 
     @classmethod
@@ -74,7 +74,11 @@ class Idearium(BaseModel):
             combined_content = self.notions[-1].content + notion.content
             self.replace(
                 len(self.notions) - 1,
-                Notion(combined_content, notion.role, notion.persistent),
+                Notion(
+                    content=combined_content,
+                    role=notion.role,
+                    persistent=notion.persistent,
+                ),
             )
             return
 

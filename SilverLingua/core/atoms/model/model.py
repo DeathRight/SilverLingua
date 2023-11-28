@@ -53,12 +53,12 @@ class Model(BaseModel, ABC):
     api_key: str
     name: str
     #
-    _role: ChatRole
-    _type: ModelType
-    _model: object
-    _model_async: object
-    _can_stream: bool
-    _tokenizer: Tokenizer
+    role: ChatRole
+    type: ModelType
+    llm: object
+    llm_async: object
+    can_stream: bool
+    tokenizer: Tokenizer
 
     @property
     @abstractmethod
