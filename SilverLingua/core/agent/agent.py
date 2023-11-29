@@ -182,6 +182,29 @@ class Agent(BaseModel):
                 break
         self._bind_tools()
 
+    def _process_generation(
+        self, responses: List[Notion], is_async=False
+    ) -> List[Notion]:
+        """Wrapper around shared logic between generate and agenerate."""
+        response = responses[0]
+        # logger.debug(f"Response: {response}")
+        if response.chat_role == ChatRole.TOOL_CALL:
+            # logger.debug("Tool call detected")
+            # Add the tool call to the idearium
+            self.idearium.append(response)
+            # Call generate again with the tool response
+            tool_calls = ToolCalls.model_validate_json(
+                '{"list": ' + response.content + "}"
+            )
+            tool_response = self._use_tools(tool_calls)
+            # logger.debug(f"Tool response: {tool_response}")
+            if is_async:
+                return self.agenerate(tool_response)
+            else:
+                return self.generate(tool_response)
+        else:
+            return responses
+
     def generate(
         self, messages: Union[Idearium, List[Notion]], **kwargs
     ) -> List[Notion]:
@@ -198,22 +221,7 @@ class Agent(BaseModel):
         """
         self.idearium.extend(messages)
         responses = self.model.generate(self.idearium, **kwargs)
-
-        response = responses[0]
-        # logger.debug(f"Response: {response}")
-        if response.chat_role == ChatRole.TOOL_CALL:
-            # logger.debug("Tool call detected")
-            # Add the tool call to the idearium
-            self.idearium.append(response)
-            # Call generate again with the tool response
-            tool_calls = ToolCalls.model_validate_json(
-                '{"list": ' + response.content + "}"
-            )
-            tool_response = self._use_tools(tool_calls)
-            # logger.debug(f"Tool response: {tool_response}")
-            return self.generate(tool_response)
-        else:
-            return responses
+        return self._process_generation(responses)
 
     async def agenerate(
         self, messages: Union[Idearium, List[Notion]], **kwargs
@@ -231,19 +239,56 @@ class Agent(BaseModel):
         """
         self.idearium.extend(messages)
         responses = await self.model.agenerate(self.idearium, **kwargs)
+        return await self._process_generation(responses, True)
 
-        response = responses[0]
-        # logger.debug(f"Response: {response}")
-        if response.chat_role == ChatRole.TOOL_CALL:
-            # logger.debug("Tool call detected")
+    def _process_stream(self, response: List[Notion], is_async=False):
+        """
+        Wrapper around shared logic between stream and astream.
+        """
+        tool_calls: Optional[ToolCalls] = None
+        for r in response:
+            if r.chat_role == ChatRole.TOOL_CALL:
+                logger.debug(f"Tool call detected: {r.content}")
+
+                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
+                tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
+                continue
+            elif r.content is not None:
+                logger.debug(f"Response: {r}")
+                yield r
+            continue
+
+        if tool_calls is not None:
+            logger.debug("Moving to tool response stream")
+
+            for i, tool_call in enumerate(tool_calls.list):
+                if not tool_call.id.startswith("call_"):
+                    # Something went wrong and this tool call is not valid
+                    tool_calls.list.pop(i)
+                    logger.error(
+                        "Invalid tool call: "
+                        + f"{tool_call.model_dump_json(exclude_none=True)}"
+                    )
+
+            tc_notion = Notion(
+                content=json.dumps(tool_calls.model_dump(exclude_none=True).list),
+                role=str(ChatRole.TOOL_CALL.value),
+            )
+
             # Add the tool call to the idearium
-            self.idearium.append(response)
-            # Call generate again with the tool response
-            tool_response = self._use_tools(response)
-            # logger.debug(f"Tool response: {tool_response}")
-            return await self.agenerate(tool_response)
-        else:
-            return responses
+            self.idearium.append(tc_notion)
+            # Call stream again with the tool response
+            tool_response = self._use_tools(tc_notion)
+
+            if is_async:
+                tool_response_stream = self.astream(tool_response)
+            else:
+                tool_response_stream = self.stream(tool_response)
+
+            if tool_response_stream is not None:
+                # Recursively yield the tool response stream
+                for r in tool_response_stream:
+                    yield r
 
     def stream(self, messages: Union[Idearium, List[Notion]], **kwargs):
         """
@@ -262,48 +307,7 @@ class Agent(BaseModel):
         """
         self.idearium.extend(messages)
         response = self.model.stream(self.idearium, **kwargs)
-
-        tool_calls: Optional[ToolCalls] = None
-        for r in response:
-            if r.chat_role == ChatRole.TOOL_CALL:
-                logger.debug(f"Tool call detected: {r.content}")
-
-                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
-                tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
-                continue
-            elif r.content is not None:
-                logger.debug(f"Response: {r}")
-                yield r
-            continue
-
-        if tool_calls is not None:
-            logger.debug("Moving to tool response stream")
-
-            for i, tool_call in enumerate(tool_calls.list):
-                if not tool_call.id.startswith("call_"):
-                    # Something went wrong and this tool call is not valid
-                    tool_calls.list.pop(i)
-                    logger.error(
-                        "Invalid tool call: "
-                        + "{tool_call.model_dump_json(exclude_none=True)}"
-                    )
-
-            tc_notion = Notion(
-                content=json.dumps(tool_calls.model_dump(exclude_none=True).list),
-                role=str(ChatRole.TOOL_CALL.value),
-            )
-
-            # Add the tool call to the idearium
-            self.idearium.append(tc_notion)
-            # Call stream again with the tool response
-            tool_response = self._use_tools(tc_notion)
-
-            tool_response_stream = self.stream(tool_response)
-
-            if tool_response_stream is not None:
-                # Recursively yield the tool response stream
-                for r in tool_response_stream:
-                    yield r
+        yield from self._process_stream(response)
 
     async def astream(self, messages: Union[Idearium, List[Notion]], **kwargs):
         """
@@ -322,45 +326,5 @@ class Agent(BaseModel):
         """
         self.idearium.extend(messages)
         response = await self.model.astream(self.idearium, **kwargs)
-
-        tool_calls: Optional[ToolCalls] = None
-        for r in response:
-            if r.chat_role == ChatRole.TOOL_CALL:
-                logger.debug(f"Tool call detected: {r.content}")
-
-                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
-                tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
-                continue
-            elif r.content is not None:
-                logger.debug(f"Response: {r}")
-                yield r
-            continue
-
-        if tool_calls is not None:
-            logger.debug("Moving to tool response stream")
-
-            for i, tool_call in enumerate(tool_calls.list):
-                if not tool_call.id.startswith("call_"):
-                    # Something went wrong and this tool call is not valid
-                    tool_calls.list.pop(i)
-                    logger.error(
-                        "Invalid tool call: "
-                        + "{tool_call.model_dump_json(exclude_none=True)}"
-                    )
-
-            tc_notion = Notion(
-                content=json.dumps(tool_calls.model_dump(exclude_none=True).list),
-                role=str(ChatRole.TOOL_CALL.value),
-            )
-
-            # Add the tool call to the idearium
-            self.idearium.append(tc_notion)
-            # Call stream again with the tool response
-            tool_response = self._use_tools(tc_notion)
-
-            tool_response_stream = self.stream(tool_response)
-
-            if tool_response_stream is not None:
-                # Recursively yield the tool response stream
-                for r in tool_response_stream:
-                    yield r
+        async for r in self._process_stream(response, True):
+            yield r

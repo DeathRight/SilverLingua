@@ -1,4 +1,5 @@
 import logging
+from ctypes import Union
 from typing import Callable, Iterator, List
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -90,8 +91,11 @@ class Idearium(BaseModel):
 
         self._trim()
 
-    def extend(self, notions: List[Notion]):
+    def extend(self, notions: Union[List[Notion], "Idearium"]):
         """Extends the Idearium with the given list of notions."""
+        if isinstance(notions, Idearium):
+            notions = notions.notions
+
         for notion in notions:
             self.append(notion)
 

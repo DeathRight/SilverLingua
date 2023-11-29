@@ -1,11 +1,14 @@
+import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Generator, List, Union
+from typing import Any, Callable, Generator, List, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..memory import Idearium, Notion, Tokenizer
 from ..role import ChatRole
+
+logger = logging.getLogger(__name__)
 
 
 class ModelType(Enum):
@@ -111,6 +114,44 @@ class Model(BaseModel, ABC):
         pass
 
     @abstractmethod
+    def _retry_call(
+        self,
+        input: Union[str, object, List[any]],
+        e: Exception,
+        api_call: Callable,
+        retries: int = 0,
+    ) -> Union[str, object]:
+        """
+        Retry logic for API calls used by `_common_call_logic`.
+        """
+        pass
+
+    def _common_call_logic(
+        self,
+        input: Union[str, object, List[any]],
+        api_call: Callable,
+        retries: int = 0,
+    ) -> Union[str, object]:
+        if input is None:
+            raise ValueError("No input provided.")
+
+        if self.type not in [ModelType.CHAT, ModelType.EMBEDDING]:
+            raise NotImplementedError("Only chat and embedding models are supported.")
+
+        if not isinstance(input, list):
+            raise ValueError("Input must be a list of ChatCompletionMessageParam.")
+
+        try:
+            out = api_call(messages=input)
+            return out
+        except Exception as e:
+            logger.error(f"Error calling OpenAI chat completion API: {e}")
+            if retries >= 3:
+                raise e
+
+            return self._retry_call(input, e, api_call, retries=retries)
+
+    @abstractmethod
     def _call(self, input: Union[str, object, List[any]], *args, **kwargs) -> object:
         """
         Calls the model with the given input and returns the raw response.
@@ -134,6 +175,25 @@ class Model(BaseModel, ABC):
         This is a lifecycle method that is called by the `agenerate` method.
         """
         pass
+
+    def _common_generate_logic(
+        self, messages: Union[Idearium, List[Notion]], is_async=False, **kwargs
+    ):
+        if messages is None:
+            raise ValueError("No messages provided.")
+
+        call_method = self._acall if is_async else self._call
+
+        # If messages is not an Idearium, convert it to one
+        # so we can take advantage of its automatic trimming.
+        if not isinstance(messages, Idearium):
+            messages = Idearium(self.tokenizer, self.max_tokens, messages)
+
+        input = self._format_request(self._preprocess(messages))
+
+        output = self._standardize_response(call_method(input, **kwargs))
+
+        return self._postprocess(output)
 
     @abstractmethod
     def generate(
@@ -163,6 +223,22 @@ class Model(BaseModel, ABC):
         and is responsible for calling all of the lifecycle methods.
         """
         pass
+
+    def _common_stream_logic(self, messages: Union[Idearium, List[Notion]]):
+        if messages is None:
+            raise ValueError("No messages provided.")
+
+        if not self.can_stream:
+            raise ValueError(
+                "This model does not support streaming. "
+                + "Please use the `generate` method instead."
+            )
+
+        if not isinstance(messages, Idearium):
+            messages = Idearium(self.tokenizer, self.max_tokens, messages)
+
+        input = self._format_request(self._preprocess(messages))
+        return input
 
     @abstractmethod
     def stream(

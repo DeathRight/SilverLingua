@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Coroutine, List, Optional, Union
+from typing import Any, Callable, Coroutine, List, Optional, Union
 
 import tiktoken
 from openai import AsyncOpenAI, OpenAI
@@ -256,178 +256,91 @@ class OpenAIModel(Model):
     def _postprocess(self, response: List[Notion]) -> List[Notion]:
         return response
 
-    def _call(
+    def _retry_call(
         self,
         input: List[ChatCompletionMessageParam],
-        create_params: CompletionCreateParams = None,
+        e: Exception,
+        api_call: Callable,
         retries: int = 0,
     ):
-        if create_params is None:
-            create_params = {}
-
         if input is None:
             raise ValueError("No input provided.")
 
-        if self.type == ModelType.CHAT:
-            if not isinstance(input, list):
-                raise ValueError("Input must be a list of ChatCompletionMessageParam.")
+        if not isinstance(input, list):
+            raise ValueError("Input must be a list of ChatCompletionMessageParam.")
 
-            out: Union[ChatCompletion, Stream[ChatCompletionChunk]]
-            try:
-                out = self.client.chat.completions.create(
-                    **self.__chat_args,
-                    **create_params,
-                    messages=input,
-                )
-            except Exception as e:
-                logger.error(f"Error calling OpenAI chat completion API: {e}")
-                if retries >= 3:
-                    raise e
+        inp = input.copy()
+        # Remove everything since the last user message
+        for i in range(len(inp) - 1, -1, -1):
+            if inp[i]["role"] == str(OpenAIChatRole.HUMAN.value):
+                inp = inp[: i + 1]
+                break
+        # Inform the AI
+        inp.append(
+            {
+                "role": str(OpenAIChatRole.SYSTEM.value),
+                "content": f"Error calling OpenAI chat completion API: {e}. "
+                + "Do not try to repeat the last action.",
+            }
+        )
+        # Try again
+        retries += 1
+        return self._common_call_logic(inp, api_call, retries)
 
-                inp = input.copy()
-                # Remove everything since the last user message
-                for i in range(len(inp) - 1, -1, -1):
-                    if inp[i]["role"] == str(OpenAIChatRole.HUMAN.value):
-                        inp = inp[: i + 1]
-                        break
-                # Inform the AI
-                inp.append(
-                    {
-                        "role": str(OpenAIChatRole.SYSTEM.value),
-                        "content": f"Error calling OpenAI chat completion API: {e}. "
-                        + "Do not try to repeat the last action.",
-                    }
-                )
-                # Try again
-                retries += 1
-                out = self._call(inp, create_params, retries)
+    def _call(
+        self,
+        input: List[ChatCompletionMessageParam],
+        retries: int = 0,
+        **kwargs,
+    ) -> ChatCompletion:
+        def api_call(**kwargs_):
+            return self.llm.create(**kwargs, **kwargs_)
 
-            return out
-        elif self.type == ModelType.EMBEDDING:
-            raise NotImplementedError("Embedding models are not yet supported.")
-        elif self.type == ModelType.CODE:
-            raise NotImplementedError("Code models are not yet supported.")
+        return self._common_call_logic(input, api_call, retries)
 
     async def _acall(
         self,
         input: List[ChatCompletionMessageParam],
-        create_params: CompletionCreateParams = None,
-    ):
-        if create_params is None:
-            create_params = {}
+        retries: int = 0,
+        **kwargs,
+    ) -> Coroutine[Any, Any, ChatCompletion]:
+        async def api_call(**kwargs_):
+            return await self.llm_async.create(**kwargs, **kwargs_)
 
-        if input is None:
-            raise ValueError("No input provided.")
-
-        if self.type == ModelType.CHAT:
-            if not isinstance(input, list):
-                raise ValueError("Input must be a list of ChatCompletionMessageParam.")
-
-            out: Union[
-                Coroutine[Any, Any, ChatCompletion], AsyncStream[ChatCompletionChunk]
-            ]
-
-            try:
-                out: Union[
-                    Coroutine[Any, Any, ChatCompletion],
-                    Coroutine[Any, Any, AsyncStream[ChatCompletionChunk]],
-                ] = self.client_async.chat.completions.create(
-                    **self.__chat_args, **create_params, messages=input
-                )
-            except Exception as e:
-                logger.error(f"Error calling OpenAI chat completion API: {e}")
-                inp = input.copy()
-                # Remove everything since the last user message
-                for i in range(len(inp) - 1, -1, -1):
-                    if inp[i]["role"] == str(OpenAIChatRole.HUMAN.value):
-                        inp = inp[: i + 1]
-                        break
-                # Inform the AI
-                inp.append(
-                    {
-                        "role": str(OpenAIChatRole.SYSTEM.value),
-                        "content": f"Error calling OpenAI chat completion API: {e}. "
-                        + "Do not try to repeat the last action.",
-                    }
-                )
-                # Try again
-                out = self._acall(inp, create_params)
-
-            return out
-        elif self.type == ModelType.EMBEDDING:
-            raise NotImplementedError("Embedding models are not yet supported.")
-        else:
-            raise NotImplementedError("Only chat and embedding models are supported.")
+        return await self._common_call_logic(input, api_call, retries)
 
     def generate(
         self,
         messages: Union[Idearium, List[Notion]],
         create_params: CompletionCreateParamsNonStreaming = None,
     ):
-        if create_params is None:
-            create_params = {}
-
-        if messages is None:
-            raise ValueError("No messages provided.")
-
-        # If messages is not an Idearium, convert it to one
-        # so we can take advantage of its automatic trimming.
-        if not isinstance(messages, Idearium):
-            messages = Idearium(self.tokenizer, self.max_tokens, messages)
-
-        input = self._format_request(self._preprocess(messages))
-
-        output = self._standardize_response(self._call(input, create_params))
-
-        return self._postprocess(output)
+        create_params = create_params or {}
+        return self._common_generate_logic(messages, False, create_params=create_params)
 
     async def agenerate(
         self,
         messages: Union[Idearium, List[Notion]],
         create_params: CompletionCreateParamsNonStreaming = None,
     ):
-        if create_params is None:
-            create_params = {}
-
-        if messages is None:
-            raise ValueError("No messages provided.")
-
-        # If messages is not an Idearium, convert it to one
-        # so we can take advantage of its automatic trimming.
-        if not isinstance(messages, Idearium):
-            messages = Idearium(self.tokenizer, self.max_tokens, messages)
-
-        input = self._format_request(self._preprocess(messages))
-
-        output = self._standardize_response(await self._acall(input, create_params))
-
-        return self._postprocess(output)
+        create_params = create_params or {}
+        return await self._common_generate_logic(
+            messages, True, create_params=create_params
+        )
 
     def stream(
         self,
         messages: Union[Idearium, List[Notion]],
         create_params: CompletionCreateParams = None,
     ):
-        if create_params is None:
-            create_params = {}
+        create_params = create_params or {}
 
-        if messages is None:
-            raise ValueError("No messages provided.")
-
-        # If messages is not an Idearium, convert it to one
-        # so we can take advantage of its automatic trimming.
-        if not isinstance(messages, Idearium):
-            messages = Idearium(self.tokenizer, self.max_tokens, messages)
-
-        input = self._format_request(self._preprocess(messages))
-
+        input = self._common_stream_logic(messages)
         output_stream: Stream[ChatCompletionChunk] = self._call(
             input, {**create_params, "stream": True}
         )
 
         for chunk in output_stream:
-            standardized_response = self._standardize_response(chunk)
-
+            standardized_response = self._postprocess(self._standardize_response(chunk))
             for notion in standardized_response:
                 yield notion
 
@@ -436,26 +349,15 @@ class OpenAIModel(Model):
         messages: Union[Idearium, List[Notion]],
         create_params: CompletionCreateParams = None,
     ):
-        if create_params is None:
-            create_params = {}
+        create_params = create_params or {}
 
-        if messages is None:
-            raise ValueError("No messages provided.")
-
-        # If messages is not an Idearium, convert it to one
-        # so we can take advantage of its automatic trimming.
-        if not isinstance(messages, Idearium):
-            messages = Idearium(self.tokenizer, self.max_tokens, messages)
-
-        input = self._format_request(self._preprocess(messages))
-
+        input = self._common_stream_logic(messages)
         output_stream: AsyncStream[ChatCompletionChunk] = await self._acall(
             input, {**create_params, "stream": True}
         )
 
         async for chunk in output_stream:
-            standardized_response = self._standardize_response(chunk)
-
+            standardized_response = self._postprocess(self._standardize_response(chunk))
             for notion in standardized_response:
                 yield notion
 
@@ -519,5 +421,4 @@ class OpenAIModel(Model):
                 f"Invalid OpenAI model name: {args['name']}.\n"
                 + "Only chat and embedding models are supported."
             )
-        logger.debug(f"TESTING. Tokenizer: {args['tokenizer']}")
         super().__init__(**args)
