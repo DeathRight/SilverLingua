@@ -58,8 +58,8 @@ class Model(BaseModel, ABC):
     #
     role: ChatRole
     type: ModelType
-    llm: object
-    llm_async: object
+    llm: Callable
+    llm_async: Callable
     can_stream: bool
     tokenizer: Tokenizer
 
@@ -151,8 +151,9 @@ class Model(BaseModel, ABC):
 
             return self._retry_call(input, e, api_call, retries=retries)
 
-    @abstractmethod
-    def _call(self, input: Union[str, object, List[any]], *args, **kwargs) -> object:
+    def _call(
+        self, input: Union[str, object, List[any]], retries: int = 0, **kwargs
+    ) -> object:
         """
         Calls the model with the given input and returns the raw response.
 
@@ -160,11 +161,14 @@ class Model(BaseModel, ABC):
 
         This is a lifecycle method that is called by the `generate` method.
         """
-        pass
 
-    @abstractmethod
+        def api_call(**kwargs_):
+            return self.llm(**kwargs_, **kwargs)
+
+        return self._common_call_logic(input, api_call, retries)
+
     async def _acall(
-        self, input: Union[str, object, List[any]], *args, **kwargs
+        self, input: Union[str, object, List[any]], retries: int = 0, **kwargs
     ) -> object:
         """
         Calls the model with the given input and returns the
@@ -174,7 +178,11 @@ class Model(BaseModel, ABC):
 
         This is a lifecycle method that is called by the `agenerate` method.
         """
-        pass
+
+        def api_call(**kwargs_):
+            return self.llm_async(**kwargs_, **kwargs)
+
+        return self._common_call_logic(input, api_call, retries)
 
     def _common_generate_logic(
         self, messages: Union[Idearium, List[Notion]], is_async=False, **kwargs

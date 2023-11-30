@@ -1,6 +1,5 @@
 import logging
-from ctypes import Union
-from typing import Callable, Iterator, List
+from typing import Callable, Iterator, List, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 

@@ -1,17 +1,13 @@
 import json
 import logging
 import os
-from typing import Any, Callable, Coroutine, List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import tiktoken
 from openai import AsyncOpenAI, OpenAI
 from openai._streaming import AsyncStream, Stream
 from openai.resources import (
-    AsyncCompletions,
-    AsyncEmbeddings,
     AsyncModerations,
-    Completions,
-    Embeddings,
     Moderations,
 )
 from openai.types.chat import (
@@ -59,8 +55,6 @@ class OpenAIModel(Model):
     client_async: AsyncOpenAI
     # Model parameters
     role: OpenAIChatRole = OpenAIChatRole
-    llm: Completions | Embeddings
-    llm_async: AsyncCompletions | AsyncEmbeddings
 
     @property
     def moderation(self) -> Moderations:
@@ -287,35 +281,18 @@ class OpenAIModel(Model):
         retries += 1
         return self._common_call_logic(inp, api_call, retries)
 
-    def _call(
-        self,
-        input: List[ChatCompletionMessageParam],
-        retries: int = 0,
-        **kwargs,
-    ) -> ChatCompletion:
-        def api_call(**kwargs_):
-            return self.llm.create(**kwargs, **kwargs_)
-
-        return self._common_call_logic(input, api_call, retries)
-
-    async def _acall(
-        self,
-        input: List[ChatCompletionMessageParam],
-        retries: int = 0,
-        **kwargs,
-    ) -> Coroutine[Any, Any, ChatCompletion]:
-        async def api_call(**kwargs_):
-            return await self.llm_async.create(**kwargs, **kwargs_)
-
-        return await self._common_call_logic(input, api_call, retries)
-
     def generate(
         self,
         messages: Union[Idearium, List[Notion]],
         create_params: CompletionCreateParamsNonStreaming = None,
     ):
         create_params = create_params or {}
-        return self._common_generate_logic(messages, False, create_params=create_params)
+        return self._common_generate_logic(
+            messages,
+            False,
+            **create_params,
+            **self.__chat_args,
+        )
 
     async def agenerate(
         self,
@@ -324,7 +301,10 @@ class OpenAIModel(Model):
     ):
         create_params = create_params or {}
         return await self._common_generate_logic(
-            messages, True, create_params=create_params
+            messages,
+            True,
+            **create_params,
+            **self.__chat_args,
         )
 
     def stream(
@@ -408,13 +388,13 @@ class OpenAIModel(Model):
 
         if args["name"] == "text-embedding-ada-002":
             args["can_stream"] = False
-            args["llm"] = args["client"].embeddings
-            args["llm_async"] = args["client_async"].embeddings
+            args["llm"] = args["client"].embeddings.create
+            args["llm_async"] = args["client_async"].embeddings.create
             args["type"] = ModelType.EMBEDDING
         elif args["name"].lower().find("gpt") != -1:
             args["can_stream"] = True
-            args["llm"] = args["client"].embeddings
-            args["llm_async"] = args["client_async"].embeddings
+            args["llm"] = args["client"].chat.completions.create
+            args["llm_async"] = args["client_async"].chat.completions.create
             args["type"] = ModelType.CHAT
         else:
             raise ValueError(
