@@ -252,6 +252,7 @@ class Agent(BaseModel):
 
                 tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
                 tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
+                # logger.debug(f"Tool calls: {tool_calls}")
                 continue
             elif r.content is not None:
                 logger.debug(f"Response: {r}")

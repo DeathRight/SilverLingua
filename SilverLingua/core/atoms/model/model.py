@@ -135,17 +135,11 @@ class Model(BaseModel, ABC):
         if input is None:
             raise ValueError("No input provided.")
 
-        if self.type not in [ModelType.CHAT, ModelType.EMBEDDING]:
-            raise NotImplementedError("Only chat and embedding models are supported.")
-
-        if not isinstance(input, list):
-            raise ValueError("Input must be a list of ChatCompletionMessageParam.")
-
         try:
             out = api_call(messages=input)
             return out
         except Exception as e:
-            logger.error(f"Error calling OpenAI chat completion API: {e}")
+            logger.error(f"Error calling LLM API: {e}")
             if retries >= 3:
                 raise e
 

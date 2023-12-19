@@ -82,11 +82,6 @@ class CompletionParams(BaseModel):
         ge=1.0,
     )
 
-    stream: Optional[bool] = Field(
-        default=None,
-        description="Whether to stream the completion or not.",
-    )
-
     seed: Optional[int] = Field(
         default=None,
         description="The seed to use for deterministic sampling.",

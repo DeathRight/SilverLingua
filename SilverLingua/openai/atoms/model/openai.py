@@ -257,11 +257,14 @@ class OpenAIModel(Model):
         api_call: Callable,
         retries: int = 0,
     ):
-        if input is None:
-            raise ValueError("No input provided.")
-
         if not isinstance(input, list):
             raise ValueError("Input must be a list of ChatCompletionMessageParam.")
+
+        if self.type not in [ModelType.CHAT, ModelType.EMBEDDING]:
+            raise ValueError(
+                f"Invalid model type: {self.type}. "
+                + "Only chat and embedding models are supported."
+            )
 
         inp = input.copy()
         # Remove everything since the last user message
@@ -316,10 +319,12 @@ class OpenAIModel(Model):
 
         input = self._common_stream_logic(messages)
         output_stream: Stream[ChatCompletionChunk] = self._call(
-            input, {**create_params, "stream": True}
+            input, **{**create_params, **self.__chat_args, "stream": True}
         )
 
+        # logger.debug(f"output_stream: {output_stream}")
         for chunk in output_stream:
+            # logger.debug(f"chunk: {chunk}")
             standardized_response = self._postprocess(self._standardize_response(chunk))
             for notion in standardized_response:
                 yield notion
@@ -333,7 +338,7 @@ class OpenAIModel(Model):
 
         input = self._common_stream_logic(messages)
         output_stream: AsyncStream[ChatCompletionChunk] = await self._acall(
-            input, {**create_params, "stream": True}
+            input, None, {**create_params, "stream": True}, **self.__chat_args
         )
 
         async for chunk in output_stream:

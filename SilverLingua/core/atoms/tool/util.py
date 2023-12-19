@@ -1,9 +1,12 @@
 import inspect
+import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class ToolCallResponse(BaseModel):
@@ -48,7 +51,7 @@ class ToolCall(BaseModel):
         """
         Concatenates two tool calls and returns the result.
 
-        If the IDs are different, prioritize the ID of 'other'.
+        If the IDs are different, prioritize the ID of 'self'.
         For 'function', merge the 'name' and 'arguments' fields.
 
         We will prefer the `id` of self over other for 2 reasons:
@@ -68,13 +71,15 @@ class ToolCall(BaseModel):
         self_extra = self.__pydantic_extra__
         other_extra = other.__pydantic_extra__
 
+        index = self.index if self.index is not None else other.index
+
         # Compare the two extra fields
         if self_extra != other_extra:
             if not self_extra or not other_extra:
                 return ToolCall(
-                    id=self.id or other.id,
+                    id=(self.id) or other.id,
                     function=merged_function,
-                    index=(self.index or other.index) or None,
+                    index=index,
                     **(self_extra or {}),
                     **(other_extra or {}),
                 )
@@ -99,14 +104,14 @@ class ToolCall(BaseModel):
             return ToolCall(
                 id=self.id or other.id,
                 function=merged_function,
-                index=(self.index or other.index) or None,
+                index=index,
                 **merged_extra,
             )
 
         return ToolCall(
             id=self.id or other.id,
             function=merged_function,
-            index=(self.index or other.index) or None,
+            index=index,
             **(self_extra or {}),
         )
 
