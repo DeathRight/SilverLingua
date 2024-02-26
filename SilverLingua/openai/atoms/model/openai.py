@@ -338,7 +338,7 @@ class OpenAIModel(Model):
 
         input = self._common_stream_logic(messages)
         output_stream: AsyncStream[ChatCompletionChunk] = await self._acall(
-            input, None, {**create_params, "stream": True}, **self.__chat_args
+            input, **{**create_params, **self.__chat_args, "stream": True}
         )
 
         async for chunk in output_stream:

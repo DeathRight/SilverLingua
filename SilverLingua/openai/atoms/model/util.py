@@ -8,6 +8,7 @@ from openai.types.chat.completion_create_params import ResponseFormat
 from pydantic import BaseModel, Field
 
 OpenAIChatModels = {
+    "gpt-4-turbo-preview": 128000,
     "gpt-4-1106-preview": 128000,
     "gpt-4-vision-preview": 128000,
     "gpt-4": 8192,
@@ -28,6 +29,7 @@ OpenAIChatModels = {
 """
 
 OpenAIChatModelName = Literal[
+    "gpt-4-turbo-preview",
     "gpt-4-1106-preview",
     "gpt-4-vision-preview",
     "gpt-4",

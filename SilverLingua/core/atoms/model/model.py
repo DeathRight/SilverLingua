@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -173,10 +174,13 @@ class Model(BaseModel, ABC):
         This is a lifecycle method that is called by the `agenerate` method.
         """
 
-        def api_call(**kwargs_):
-            return self.llm_async(**kwargs_, **kwargs)
+        async def api_call(**kwargs_):
+            return await self.llm_async(**kwargs_, **kwargs)
 
-        return self._common_call_logic(input, api_call, retries)
+        result = self._common_call_logic(input, api_call, retries)
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
 
     def _common_generate_logic(
         self, messages: Union[Idearium, List[Notion]], is_async=False, **kwargs
@@ -193,9 +197,18 @@ class Model(BaseModel, ABC):
 
         input = self._format_request(self._preprocess(messages))
 
-        output = self._standardize_response(call_method(input, **kwargs))
+        if is_async:
 
-        return self._postprocess(output)
+            async def call():
+                response = await call_method(input, **kwargs)
+                output = self._standardize_response(response)
+                return self._postprocess(output)
+
+            return call()
+        else:
+            response = call_method(input, **kwargs)
+            output = self._standardize_response(response)
+            return self._postprocess(output)
 
     @abstractmethod
     def generate(

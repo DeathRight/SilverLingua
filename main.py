@@ -1,3 +1,4 @@
+import asyncio
 import random
 
 from dotenv import load_dotenv
@@ -69,26 +70,39 @@ logger.debug(rd_tool.name)
 
 ##########
 load_dotenv()
-agent = OpenAIChatAgent()  # ("gpt-4-1106-preview")
+agent = OpenAIChatAgent("gpt-4-turbo-preview")  # ("gpt-4-1106-preview")
 agent.add_tool(rd_tool)
 
 
-print("About to start chat stream...")
-stream = agent.stream(
-    [
-        Notion(
-            content="roll 1d20",
-            role=str(OpenAIChatRole.HUMAN.value),
-        )
-    ]
-)
-for notion in stream:
-    agent.idearium.append(notion)
-    print(agent.idearium[-1])
+async def test_stream():
+    async for notion in agent.astream(
+        [
+            Notion(
+                content="roll 1d20",
+                role=str(OpenAIChatRole.HUMAN.value),
+            )
+        ]
+    ):
+        agent.idearium.append(notion)
+        print(agent.idearium[-1])
 
-r = agent.generate([Notion(content=":)", role=str(OpenAIChatRole.HUMAN.value))])
-agent.idearium.append(r[0])
-print(r[0])
+
+print("About to start chat stream...")
+
+asyncio.run(test_stream())
+
+
+"""async def test():
+    r = asyncio.create_task(
+        agent.agenerate([Notion(content=":)", role=str(OpenAIChatRole.HUMAN.value))])
+    )
+    print("Testing async")
+    res = await r
+    agent.idearium.append(res[0])
+    print(res[0])
+
+
+asyncio.run(test())"""
 
 
 # Start command line chat with agent

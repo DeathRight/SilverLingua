@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import json
 import logging
@@ -33,8 +34,6 @@ class Agent(BaseModel):
     idearium: Idearium
     """
     The Idearium used by the agent.
-
-    WARNING: Do not modify this list directly.
     """
     tools: List[Tool]
     """
@@ -221,7 +220,8 @@ class Agent(BaseModel):
         """
         self.idearium.extend(messages)
         responses = self.model.generate(self.idearium, **kwargs)
-        return self._process_generation(responses)
+        result = self._process_generation(responses)
+        return result
 
     async def agenerate(
         self, messages: Union[Idearium, List[Notion]], **kwargs
@@ -239,57 +239,106 @@ class Agent(BaseModel):
         """
         self.idearium.extend(messages)
         responses = await self.model.agenerate(self.idearium, **kwargs)
-        return await self._process_generation(responses, True)
+        result = self._process_generation(responses, True)
+        return await result if asyncio.iscoroutine(result) else result
 
-    def _process_stream(self, response: List[Notion], is_async=False):
+    def _process_tool_calls(self, tool_calls: ToolCalls):
         """
-        Wrapper around shared logic between stream and astream.
+        Processes tool calls and returns the tool response.
+
+        Args:
+            tool_calls (ToolCalls): The tool calls to process.
+
+        Returns:
+            Optional[ToolCalls]: The tool response. If None, no tool calls were found.
         """
-        tool_calls: Optional[ToolCalls] = None
-        for r in response:
-            if r.chat_role == ChatRole.TOOL_CALL:
-                logger.debug(f"Tool call detected: {r.content}")
+        for i, tool_call in enumerate(tool_calls.list):
+            if not tool_call.id.startswith("call_"):
+                # Something went wrong and this tool call is not valid
+                tool_calls.list.pop(i)
+                logger.error(
+                    "Invalid tool call: "
+                    + f"{tool_call.model_dump_json(exclude_none=True)}"
+                )
 
-                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
-                tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
-                # logger.debug(f"Tool calls: {tool_calls}")
-                continue
-            elif r.content is not None:
-                logger.debug(f"Response: {r}")
-                yield r
-            continue
+        tc_dump = tool_calls.model_dump(exclude_none=True)
+        if tc_dump.get("list"):
+            logger.debug(f"Tool calls: {tc_dump}")
 
-        if tool_calls is not None:
-            logger.debug("Moving to tool response stream")
-
-            for i, tool_call in enumerate(tool_calls.list):
-                if not tool_call.id.startswith("call_"):
-                    # Something went wrong and this tool call is not valid
-                    tool_calls.list.pop(i)
-                    logger.error(
-                        "Invalid tool call: "
-                        + f"{tool_call.model_dump_json(exclude_none=True)}"
-                    )
-
+            # Create a new notion from the tool calls
             tc_notion = Notion(
-                content=json.dumps(tool_calls.model_dump(exclude_none=True).list),
+                content=json.dumps(tc_dump.get("list")),
                 role=str(ChatRole.TOOL_CALL.value),
             )
 
             # Add the tool call to the idearium
             self.idearium.append(tc_notion)
             # Call stream again with the tool response
-            tool_response = self._use_tools(tc_notion)
+            tool_response = self._use_tools(tool_calls)
+            return tool_response
+        else:
+            logger.error("No tool calls found")
+            return None
 
-            if is_async:
-                tool_response_stream = self.astream(tool_response)
-            else:
-                tool_response_stream = self.stream(tool_response)
+    def _process_stream(self, response_stream, is_async=False):
+        """
+        Wrapper around shared logic between stream and astream.
+        """
 
-            if tool_response_stream is not None:
-                # Recursively yield the tool response stream
-                for r in tool_response_stream:
+        async def async_process():
+            tool_calls: Optional[ToolCalls] = None
+            async for r in response_stream:
+                if r.chat_role == ChatRole.TOOL_CALL:
+                    logger.debug(f"Tool call detected: {r.content}")
+
+                    tc_chunks = ToolCalls.model_validate_json(
+                        '{"list": ' + r.content + "}"
+                    )
+                    tool_calls = (
+                        tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
+                    )
+                    continue
+                elif r.content is not None:
+                    logger.debug(f"Response: {r}")
                     yield r
+                continue
+
+            if tool_calls is not None:
+                logger.debug("Moving to tool response stream")
+                tool_response = self._process_tool_calls(tool_calls)
+                if tool_response is not None:
+                    async for r in self.astream(tool_response):
+                        yield r
+
+        def sync_process():
+            tool_calls: Optional[ToolCalls] = None
+            for r in response_stream:
+                if r.chat_role == ChatRole.TOOL_CALL:
+                    logger.debug(f"Tool call detected: {r.content}")
+
+                    tc_chunks = ToolCalls.model_validate_json(
+                        '{"list": ' + r.content + "}"
+                    )
+                    tool_calls = (
+                        tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
+                    )
+                    continue
+                elif r.content is not None:
+                    logger.debug(f"Response: {r}")
+                    yield r
+                continue
+
+            if tool_calls is not None:
+                logger.debug("Moving to tool response stream")
+                tool_response = self._process_tool_calls(tool_calls)
+                if tool_response is not None:
+                    for r in self.stream(tool_response):
+                        yield r
+
+        if is_async:
+            return async_process()
+        else:
+            return sync_process()
 
     def stream(self, messages: Union[Idearium, List[Notion]], **kwargs):
         """
@@ -307,8 +356,10 @@ class Agent(BaseModel):
                 messages.
         """
         self.idearium.extend(messages)
-        response = self.model.stream(self.idearium, **kwargs)
-        yield from self._process_stream(response)
+        response_stream = self.model.stream(self.idearium, **kwargs)
+        processed_stream = self._process_stream(response_stream)
+        for r in processed_stream:
+            yield r
 
     async def astream(self, messages: Union[Idearium, List[Notion]], **kwargs):
         """
@@ -326,6 +377,7 @@ class Agent(BaseModel):
                 messages.
         """
         self.idearium.extend(messages)
-        response = await self.model.astream(self.idearium, **kwargs)
-        async for r in self._process_stream(response, True):
+        response_stream = self.model.astream(self.idearium, **kwargs)
+        processed_stream = self._process_stream(response_stream, True)
+        async for r in processed_stream:
             yield r

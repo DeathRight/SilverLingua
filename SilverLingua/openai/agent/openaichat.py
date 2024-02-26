@@ -60,7 +60,7 @@ class OpenAIChatAgent(Agent):
         model = OpenAIModel(
             name=model_name, api_key=api_key, completion_params=completion_params
         )
-        print(f"Testing 2: Tokenizer: {model.tokenizer}")
+        # print(f"Testing 2: Tokenizer: {model.tokenizer}")
 
         args = {"model": model}
         if idearium is not None:
