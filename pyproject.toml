@@ -1,27 +1,75 @@
 [tool.poetry]
-name = "python-template"
+name = "SilverLingua"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+description = "An AI agent framework"
+authors = ["Travis Baldwin <travis@voidtavern.dev>"]
+packages = [{include = "SilverLingua", from = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11.0,<3.12"
 jinja2 = "3.1.2"
-helpers = "^0.2.0"
 loguru = "0.7.2"
-nodejsscan = "^3.7"
 openai = "^1.3.5"
 tiktoken = "^0.5.1"
 python-dotenv = "^1.0.0"
 pydantic = "^2.5.2"
+pytest = "^8.3.4"
+pytest-asyncio = "^0.23.5"
+pytest-cov = "^4.1.0"
+pytest-dependency = "^0.5.1"
+anthropic = "^0.40.0"
+
+[tool.poetry.scripts]
+test = "pytest:main"
+test-core = "pytest:main tests/core/test_core.py -v"
+test-atoms = "pytest:main tests/core/atoms -v"
+test-molecules = "pytest:main tests/core/molecules -v"
+test-organisms = "pytest:main tests/core/organisms -v"
+test-templates = "pytest:main tests/core/templates -v"
+test-openai = "pytest:main tests/openai -v"
+test-anthropic = "pytest:main tests/anthropic -v"
+test-verbose = "pytest:main -v"
+test-watch = "pytest:main -f -v"
+test-cov = "pytest:main --cov=src/SilverLingua"
+
+[tool.pytest.ini_options]
+addopts = "-v -ra -q"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+markers = [
+    # Core component hierarchy
+    "core: mark a test as a core component test",
+    "atoms: mark a test as an atomic component test",
+    "molecules: mark a test as a molecular component test",
+    "organisms: mark a test as an organism component test",
+    "templates: mark a test as a template component test",
+    # Specific component types
+    "memory: memory component tests",
+    "tokenizer: tokenizer component tests",
+    "tool: tool component tests",
+    "prompt: prompt component tests",
+    "role: role component tests",
+    "notion: notion component tests",
+    "link: link component tests",
+    "idearium: idearium component tests",
+    "model: model component tests",
+    "agent: agent component tests",
+    # Provider-specific tests
+    "openai: OpenAI implementation tests",
+    "anthropic: Anthropic implementation tests",
+    # Test types
+    "unit: unit tests",
+    "integration: integration tests",
+    "streaming: streaming functionality tests",
+    "async: asynchronous functionality tests"
+]
 
 [tool.pyright]
-# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
 useLibraryCodeForTypes = true
 exclude = [".cache"]
 
 [tool.ruff]
-# https://beta.ruff.rs/docs/configuration/
 select = ['E', 'W', 'F', 'I', 'B', 'C4', 'ARG', 'SIM']
 ignore = ['W291', 'W292', 'W293']
 
