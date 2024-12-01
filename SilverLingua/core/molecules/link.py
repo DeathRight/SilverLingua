@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 
 from pydantic import Field
 
-from .memory import Memory
+from ..atoms.memory import Memory
 from .notion import Notion
 
 

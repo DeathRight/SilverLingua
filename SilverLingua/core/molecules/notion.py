@@ -1,9 +1,9 @@
 from typing import Union
 
-from pydantic import ConfigDict, validator
+from pydantic import ConfigDict, field_validator
 
-from ..role import ChatRole, ReactRole
-from .memory import Memory
+from ..atoms.memory import Memory
+from ..atoms.role import ChatRole, ReactRole
 
 
 class Notion(Memory):
@@ -22,16 +22,25 @@ class Notion(Memory):
     role: str
     persistent: bool = False
 
-    @validator("role", pre=True, always=True)
+    @field_validator("role", mode="before")
+    @classmethod
     def validate_role(cls, v: Union[ChatRole, ReactRole, str]):
         if isinstance(v, (ChatRole, ReactRole)):
-            return v.value
+            return v.value.value
         elif isinstance(v, str):
             return v
-        raise TypeError(f"Expected a ChatRole, ReactRole, or a string, got {type(v)}")
+        raise ValueError(f"Expected a ChatRole, ReactRole, or a string, got {type(v)}")
 
     def __str__(self) -> str:
         return f"{self.role}: {self.content}"
+
+    def __init__(
+        self,
+        content: str,
+        role: Union[ChatRole, ReactRole, str],
+        persistent: bool = False,
+    ):
+        super().__init__(content=content, role=str(role), persistent=persistent)
 
     @property
     def chat_role(self) -> ChatRole:
@@ -40,7 +49,7 @@ class Notion(Memory):
 
         (See `config`)
         """
-        from ....config import Config
+        from ...config import Config
 
         # Check if self.role is a member of Role
         r = Config.get_chat_role(self.role)
@@ -57,7 +66,7 @@ class Notion(Memory):
 
         (See `config`)
         """
-        from ....config import Config
+        from ...config import Config
 
         # Check if self.role is a member of Role
         r = Config.get_react_role(self.role)

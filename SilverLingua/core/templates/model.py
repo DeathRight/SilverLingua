@@ -2,14 +2,20 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Callable, Generator, List, Union
+from typing import Any, Callable, Generator, List, Type, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..memory import Idearium, Notion, Tokenizer
-from ..role import ChatRole
+from ..atoms import ChatRole, Tokenizer
+from ..molecules import Notion
+from ..organisms import Idearium
 
 logger = logging.getLogger(__name__)
+
+Messages = Union[str, Notion, Idearium, List[Union[str, Notion]]]
+"""
+A type alias for the various types of messages that can be passed to a model.
+"""
 
 
 class ModelType(Enum):
@@ -57,7 +63,7 @@ class Model(BaseModel, ABC):
     api_key: str
     name: str
     #
-    role: ChatRole
+    role: Type[ChatRole]
     type: ModelType
     llm: Callable
     llm_async: Callable
@@ -72,15 +78,44 @@ class Model(BaseModel, ABC):
         """
         pass
 
-    @abstractmethod
-    def _preprocess(self, messages: List[Notion], *args, **kwargs) -> List[Notion]:
+    def _process_input(self, messages: Messages) -> Idearium:
+        if isinstance(messages, str):
+            notions = [Notion(content=messages, role=self.role.HUMAN)]
+        elif isinstance(messages, Notion):
+            notions = [messages]
+        elif isinstance(messages, Idearium):
+            return messages  # Already an Idearium, no need to convert
+        elif isinstance(messages, list):
+            notions = [
+                (
+                    Notion(content=msg, role=self.role.HUMAN)
+                    if isinstance(msg, str)
+                    else msg
+                )
+                for msg in messages
+            ]
+        else:
+            raise ValueError("Invalid input type for messages")
+
+        return Idearium(self.tokenizer, self.max_tokens, notions)
+
+    def _convert_role(self, role: ChatRole) -> str:
+        """
+        Converts the standard ChatRole to the model-specific role.
+        """
+        return str(self.role[role.name].value)
+
+    def _preprocess(self, messages: List[Notion]) -> List[Notion]:
         """
         Preprocesses the List of `Notions`, applying any effects necessary
         before being prepped for input into an API.
 
         This is a lifecycle method that is called by the `generate` method.
         """
-        pass
+        return [
+            Notion(msg.content, self._convert_role(msg.chat_role), msg.persistent)
+            for msg in messages
+        ]
 
     @abstractmethod
     def _format_request(
@@ -183,19 +218,18 @@ class Model(BaseModel, ABC):
         return result
 
     def _common_generate_logic(
-        self, messages: Union[Idearium, List[Notion]], is_async=False, **kwargs
+        self,
+        messages: Messages,
+        is_async=False,
+        **kwargs,
     ):
         if messages is None:
             raise ValueError("No messages provided.")
 
         call_method = self._acall if is_async else self._call
 
-        # If messages is not an Idearium, convert it to one
-        # so we can take advantage of its automatic trimming.
-        if not isinstance(messages, Idearium):
-            messages = Idearium(self.tokenizer, self.max_tokens, messages)
-
-        input = self._format_request(self._preprocess(messages))
+        idearium = self._process_input(messages)
+        input = self._format_request(self._preprocess(idearium))
 
         if is_async:
 
@@ -212,12 +246,16 @@ class Model(BaseModel, ABC):
 
     @abstractmethod
     def generate(
-        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+        self,
+        messages: Messages,
+        *args,
+        **kwargs,
     ) -> List[Notion]:
         """
         Calls the model with the given messages and returns the response.
 
-        Messages can be either an Idearium or a List of Notions.
+        Messages can be any of:
+        string, list of strings, Notion, list of Notions, or Idearium.
 
         This is the primary method for generating responses from the model,
         and is responsible for calling all of the lifecycle methods.
@@ -226,20 +264,24 @@ class Model(BaseModel, ABC):
 
     @abstractmethod
     async def agenerate(
-        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+        self,
+        messages: Messages,
+        *args,
+        **kwargs,
     ) -> List[Notion]:
         """
         Calls the model with the given messages and returns the response
         asynchronously.
 
-        Messages can be either an Idearium or a List of Notions.
+        Messages can be any of:
+        string, list of strings, Notion, list of Notions, or Idearium.
 
         This is the primary method for generating async responses from the model,
         and is responsible for calling all of the lifecycle methods.
         """
         pass
 
-    def _common_stream_logic(self, messages: Union[Idearium, List[Notion]]):
+    def _common_stream_logic(self, messages: Messages):
         if messages is None:
             raise ValueError("No messages provided.")
 
@@ -249,19 +291,20 @@ class Model(BaseModel, ABC):
                 + "Please use the `generate` method instead."
             )
 
-        if not isinstance(messages, Idearium):
-            messages = Idearium(self.tokenizer, self.max_tokens, messages)
-
-        input = self._format_request(self._preprocess(messages))
+        idearium = self._process_input(messages)
+        input = self._format_request(self._preprocess(idearium))
         return input
 
     @abstractmethod
     def stream(
-        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+        self, messages: Messages, *args, **kwargs
     ) -> Generator[Notion, Any, None]:
         """
         Streams the model with the given messages and returns the response,
         one token at a time.
+
+        Messages can be any of:
+        string, list of strings, Notion, list of Notions, or Idearium.
 
         If the model cannot be streamed, this will raise an exception.
         """
@@ -269,11 +312,14 @@ class Model(BaseModel, ABC):
 
     @abstractmethod
     async def astream(
-        self, messages: Union[Idearium, List[Notion]], *args, **kwargs
+        self, messages: Messages, *args, **kwargs
     ) -> Generator[Notion, Any, None]:
         """
         Streams the model with the given messages and returns the response,
         one token at a time, asynchronously.
+
+        Messages can be any of:
+        string, list of strings, Notion, list of Notions, or Idearium.
 
         If the model cannot be streamed, this will raise an exception.
         """

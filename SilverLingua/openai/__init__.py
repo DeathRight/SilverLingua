@@ -2,9 +2,10 @@ import logging
 
 from SilverLingua import Module
 
-from .agent import OpenAIChatAgent  # noqa
 from .atoms import OpenAIChatRole
+from .templates.agent import OpenAIChatAgent
 
+__all__ = ["OpenAIChatAgent", "OpenAIChatRole"]
 logger = logging.getLogger(__name__)
 
 openai_module = Module(

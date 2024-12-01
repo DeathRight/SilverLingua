@@ -1,20 +1,12 @@
 import logging
-from typing import Callable, Iterator, List, Union
+from typing import Iterator, List, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .notion import Notion
+from ..atoms.tokenizer import Tokenizer
+from ..molecules.notion import Notion
 
 logger = logging.getLogger(__name__)
-
-
-class Tokenizer(BaseModel):
-    """
-    A tokenizer that can encode and decode strings.
-    """
-
-    encode: Callable[[str], List[int]]
-    decode: Callable[[List[int]], str]
 
 
 class Idearium(BaseModel):
@@ -64,7 +56,11 @@ class Idearium(BaseModel):
 
     def append(self, notion: Notion):
         """Appends the given notion to the end of the Idearium."""
+        logger.debug(f"Appending notion: {notion.content!r}")
         tokenized_notion = self.tokenizer.encode(notion.content)
+
+        if self.notions:
+            logger.debug(f"Current last notion: {self.notions[-1].content!r}")
 
         if (
             self.notions
@@ -80,8 +76,12 @@ class Idearium(BaseModel):
                     persistent=notion.persistent,
                 ),
             )
+            logger.debug(
+                f"After replace, about to return combined content: {combined_content!r}"
+            )
             return
 
+        logger.debug(f"Hitting append path. Appending new notion: {notion.content!r}")
         self.notions.append(notion)
         self.tokenized_notions.append(tokenized_notion)
 

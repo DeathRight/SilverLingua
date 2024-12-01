@@ -2,15 +2,14 @@ import asyncio
 import contextlib
 import json
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from ..atoms import ChatRole, Idearium, Model, Notion, Tool
-from ..atoms.tool import (
-    ToolCallResponse,
-    ToolCalls,
-)
+from ..atoms import ChatRole, Tool, ToolCallResponse, ToolCalls
+from ..molecules import Notion
+from ..organisms import Idearium
+from ..templates.model import Messages, Model
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +41,18 @@ class Agent(BaseModel):
     WARNING: Do not modify this list directly. Use `add_tool`, `add_tools`,
     and `remove_tool` instead.
     """
+    auto_append_response: bool = True
+    """
+    Whether to automatically append the response to the idearium after
+    generating a response.
+    """
 
     def __init__(
         self,
         model: Model,
         idearium: Optional[Idearium] = None,
         tools: Optional[List[Tool]] = None,
+        auto_append_response: bool = True,
     ):
         """
         Initializes the agent.
@@ -63,6 +68,7 @@ class Agent(BaseModel):
             idearium=idearium
             or Idearium(tokenizer=model.tokenizer, max_tokens=model.max_tokens),
             tools=tools or [],
+            auto_append_response=auto_append_response,
         )
 
     def model_post_init(self, __content):
@@ -181,6 +187,25 @@ class Agent(BaseModel):
                 break
         self._bind_tools()
 
+    def _process_messages(self, messages: Messages) -> List[Notion]:
+        """Convert various message types into a list of Notions."""
+        if isinstance(messages, str):
+            return [Notion(content=messages, role=str(self.role.HUMAN.value))]
+        elif isinstance(messages, Notion):
+            return [messages]
+        elif isinstance(messages, Idearium):
+            return messages.notions
+        elif isinstance(messages, list):
+            return [
+                (
+                    Notion(content=msg, role=str(self.role.HUMAN.value))
+                    if isinstance(msg, str)
+                    else msg
+                )
+                for msg in messages
+            ]
+        raise ValueError(f"Unsupported message type: {type(messages)}")
+
     def _process_generation(
         self, responses: List[Notion], is_async=False
     ) -> List[Notion]:
@@ -204,43 +229,50 @@ class Agent(BaseModel):
         else:
             return responses
 
-    def generate(
-        self, messages: Union[Idearium, List[Notion]], **kwargs
-    ) -> List[Notion]:
+    def generate(self, messages: Messages, **kwargs) -> List[Notion]:
         """
         Generates a response to the given messages by calling the
         underlying model's generate method and checking/actualizing tool usage.
 
         Args:
-            messages (Union[Idearium, List[Notion]]): The messages to respond to.
+            messages (Union[str, Notion, Idearium, List[Union[str, Notion]]]):
+            The messages to respond to.
 
         Returns:
             List[Notion]: A list of responses to the given messages.
                 (Many times there will only be one response.)
         """
-        self.idearium.extend(messages)
+        self.idearium.extend(self._process_messages(messages))
         responses = self.model.generate(self.idearium, **kwargs)
         result = self._process_generation(responses)
+
+        if self.auto_append_response:
+            self.idearium.extend(result)
+
         return result
 
-    async def agenerate(
-        self, messages: Union[Idearium, List[Notion]], **kwargs
-    ) -> List[Notion]:
+    async def agenerate(self, messages: Messages, **kwargs) -> List[Notion]:
         """
         Asynchronously generates a response to the given messages by calling the
         underlying model's agenerate method and checking/actualizing tool usage.
 
         Args:
-            messages (Union[Idearium, List[Notion]]): The messages to respond to.
+            messages (Union[str, Notion, Idearium, List[Union[str, Notion]]]):
+            The messages to respond to.
 
         Returns:
             List[Notion]: A list of responses to the given messages.
                 (Many times there will only be one response.)
         """
-        self.idearium.extend(messages)
+        self.idearium.extend(self._process_messages(messages))
         responses = await self.model.agenerate(self.idearium, **kwargs)
         result = self._process_generation(responses, True)
-        return await result if asyncio.iscoroutine(result) else result
+        r = await result if asyncio.iscoroutine(result) else result
+
+        if self.auto_append_response:
+            self.idearium.extend(r)
+
+        return r
 
     def _process_tool_calls(self, tool_calls: ToolCalls):
         """
@@ -280,67 +312,7 @@ class Agent(BaseModel):
             logger.error("No tool calls found")
             return None
 
-    def _process_stream(self, response_stream, is_async=False):
-        """
-        Wrapper around shared logic between stream and astream.
-        """
-
-        async def async_process():
-            tool_calls: Optional[ToolCalls] = None
-            async for r in response_stream:
-                if r.chat_role == ChatRole.TOOL_CALL:
-                    logger.debug(f"Tool call detected: {r.content}")
-
-                    tc_chunks = ToolCalls.model_validate_json(
-                        '{"list": ' + r.content + "}"
-                    )
-                    tool_calls = (
-                        tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
-                    )
-                    continue
-                elif r.content is not None:
-                    logger.debug(f"Response: {r}")
-                    yield r
-                continue
-
-            if tool_calls is not None:
-                logger.debug("Moving to tool response stream")
-                tool_response = self._process_tool_calls(tool_calls)
-                if tool_response is not None:
-                    async for r in self.astream(tool_response):
-                        yield r
-
-        def sync_process():
-            tool_calls: Optional[ToolCalls] = None
-            for r in response_stream:
-                if r.chat_role == ChatRole.TOOL_CALL:
-                    logger.debug(f"Tool call detected: {r.content}")
-
-                    tc_chunks = ToolCalls.model_validate_json(
-                        '{"list": ' + r.content + "}"
-                    )
-                    tool_calls = (
-                        tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
-                    )
-                    continue
-                elif r.content is not None:
-                    logger.debug(f"Response: {r}")
-                    yield r
-                continue
-
-            if tool_calls is not None:
-                logger.debug("Moving to tool response stream")
-                tool_response = self._process_tool_calls(tool_calls)
-                if tool_response is not None:
-                    for r in self.stream(tool_response):
-                        yield r
-
-        if is_async:
-            return async_process()
-        else:
-            return sync_process()
-
-    def stream(self, messages: Union[Idearium, List[Notion]], **kwargs):
+    def stream(self, messages: Messages, **kwargs):
         """
         Streams a response to the given prompt by calling the
         underlying model's stream method and checking/actualizing tool usage.
@@ -349,19 +321,40 @@ class Agent(BaseModel):
         streaming.
 
         Args:
-            messages (Union[Idearium, List[Notion]]): The messages to respond to.
+            messages (Union[str, Notion, Idearium, List[Union[str, Notion]]]):
+            The messages to respond to.
 
         Returns:
             Generator[Notion, Any, None]: A generator of responses to the given
                 messages.
         """
-        self.idearium.extend(messages)
+        self.idearium.extend(self._process_messages(messages))
         response_stream = self.model.stream(self.idearium, **kwargs)
-        processed_stream = self._process_stream(response_stream)
-        for r in processed_stream:
-            yield r
 
-    async def astream(self, messages: Union[Idearium, List[Notion]], **kwargs):
+        # Process stream directly
+        tool_calls: Optional[ToolCalls] = None
+
+        for r in response_stream:
+            if r.chat_role == ChatRole.TOOL_CALL:
+                logger.debug(f"Tool call detected: {r.content}")
+                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
+                tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
+                continue
+            elif r.content is not None:
+                logger.debug(f"Got chunk in stream: {r.content!r}")
+                if self.auto_append_response:
+                    self.idearium.append(r)
+                yield r
+
+        # Handle tool calls if any
+        if tool_calls is not None:
+            logger.debug("Moving to tool response stream")
+            tool_response = self._process_tool_calls(tool_calls)
+            if tool_response is not None:
+                for r in self.stream(tool_response):
+                    yield r
+
+    async def astream(self, messages: Messages, **kwargs):
         """
         Asynchronously streams a response to the given prompt by calling the
         underlying model's astream method and checking/actualizing tool usage.
@@ -370,14 +363,35 @@ class Agent(BaseModel):
         streaming.
 
         Args:
-            messages (Union[Idearium, List[Notion]]): The messages to respond to.
+            messages (Union[str, Notion, Idearium, List[Union[str, Notion]]]):
+            The messages to respond to.
 
         Returns:
             Generator[Notion, Any, None]: A generator of responses to the given
                 messages.
         """
-        self.idearium.extend(messages)
+        self.idearium.extend(self._process_messages(messages))
         response_stream = self.model.astream(self.idearium, **kwargs)
-        processed_stream = self._process_stream(response_stream, True)
-        async for r in processed_stream:
-            yield r
+
+        # Process stream directly
+        tool_calls: Optional[ToolCalls] = None
+
+        async for r in response_stream:
+            if r.chat_role == ChatRole.TOOL_CALL:
+                logger.debug(f"Tool call detected: {r.content}")
+                tc_chunks = ToolCalls.model_validate_json('{"list": ' + r.content + "}")
+                tool_calls = tool_calls and tool_calls.concat(tc_chunks) or tc_chunks
+                continue
+            elif r.content is not None:
+                logger.debug(f"Got chunk in astream: {r.content!r}")
+                if self.auto_append_response:
+                    self.idearium.append(r)
+                yield r
+
+        # Handle tool calls if any
+        if tool_calls is not None:
+            logger.debug("Moving to tool response stream")
+            tool_response = self._process_tool_calls(tool_calls)
+            if tool_response is not None:
+                async for r in self.astream(tool_response):
+                    yield r

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Type
 
-from .role import RoleMember
+from .member import RoleMember
 
 
 class ReactRole(Enum):

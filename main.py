@@ -4,9 +4,9 @@ import random
 from dotenv import load_dotenv
 
 from logging_config import logger
-from SilverLingua.core.atoms import Notion, Tool, prompt
-from SilverLingua.openai import OpenAIChatAgent  # noqa
-from SilverLingua.openai.atoms.role.chat import OpenAIChatRole
+from SilverLingua.core.atoms import Tool
+from SilverLingua.core.atoms.prompt import prompt
+from SilverLingua.openai import OpenAIChatAgent
 from SilverLingua.util import timeit
 
 
@@ -75,15 +75,8 @@ agent.add_tool(rd_tool)
 
 
 async def test_stream():
-    async for notion in agent.astream(
-        [
-            Notion(
-                content="roll 1d20",
-                role=str(OpenAIChatRole.HUMAN.value),
-            )
-        ]
-    ):
-        agent.idearium.append(notion)
+    stream = agent.astream("roll 1d20")
+    async for _ in stream:
         print(agent.idearium[-1])
 
 

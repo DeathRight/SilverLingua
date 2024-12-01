@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Type, Union
 
 import tiktoken
 from openai import AsyncOpenAI, OpenAI
@@ -24,12 +24,11 @@ from openai.types.chat.completion_create_params import (
 )
 from pydantic import ConfigDict, Field
 
-from SilverLingua.core.atoms.memory import Idearium, Notion
-from SilverLingua.core.atoms.memory.idearium import Tokenizer
-from SilverLingua.core.atoms.model import Model, ModelType
-from SilverLingua.core.atoms.role import ChatRole
+from SilverLingua.core.atoms import ChatRole, Tokenizer
+from SilverLingua.core.molecules import Notion
+from SilverLingua.core.templates.model import Messages, Model, ModelType
 
-from ..role import OpenAIChatRole
+from ...atoms import OpenAIChatRole
 from .util import CompletionParams, OpenAIModelName, OpenAIModels
 
 logger = logging.getLogger(__name__)
@@ -54,7 +53,7 @@ class OpenAIModel(Model):
     client: OpenAI
     client_async: AsyncOpenAI
     # Model parameters
-    role: OpenAIChatRole = OpenAIChatRole
+    role: Type[ChatRole] = OpenAIChatRole
 
     @property
     def moderation(self) -> Moderations:
@@ -85,18 +84,6 @@ class OpenAIModel(Model):
             **self.completion_params.model_dump(exclude_none=True),
             "model": self.name,
         }
-
-    def _preprocess(self, messages: List[Notion]):
-        msgs: List[Notion] = []
-        for msg in messages:
-            msgs.append(
-                Notion(
-                    content=msg.content,
-                    role=str(OpenAIChatRole[msg.chat_role.name].value),
-                    persistent=msg.persistent,
-                )
-            )
-        return msgs
 
     def _format_request(
         self, messages: List[Notion]
@@ -190,13 +177,13 @@ class OpenAIModel(Model):
                 hasattr(response.choices[0], "delta")
                 and response.choices[0].delta is not None
             ):
-                # logger.debug("response is a chunk")
+                logger.debug("response is a chunk")
                 rc: ChatCompletionChunk = response
                 for choice in rc.choices:
                     msg = choice.delta
-                    # logger.debug(f"msg: {msg}")
+                    logger.debug(f"msg: {msg}")
                     if hasattr(msg, "tool_calls") and msg.tool_calls is not None:
-                        # logger.debug("msg has tool_calls")
+                        logger.debug("msg has tool_calls")
                         output.append(
                             Notion(
                                 content=json.dumps(
@@ -286,7 +273,7 @@ class OpenAIModel(Model):
 
     def generate(
         self,
-        messages: Union[Idearium, List[Notion]],
+        messages: Messages,
         create_params: CompletionCreateParamsNonStreaming = None,
     ):
         create_params = create_params or {}
@@ -299,7 +286,7 @@ class OpenAIModel(Model):
 
     async def agenerate(
         self,
-        messages: Union[Idearium, List[Notion]],
+        messages: Messages,
         create_params: CompletionCreateParamsNonStreaming = None,
     ):
         create_params = create_params or {}
@@ -312,7 +299,7 @@ class OpenAIModel(Model):
 
     def stream(
         self,
-        messages: Union[Idearium, List[Notion]],
+        messages: Messages,
         create_params: CompletionCreateParams = None,
     ):
         create_params = create_params or {}
@@ -331,7 +318,7 @@ class OpenAIModel(Model):
 
     async def astream(
         self,
-        messages: Union[Idearium, List[Notion]],
+        messages: Messages,
         create_params: CompletionCreateParams = None,
     ):
         create_params = create_params or {}

@@ -5,11 +5,12 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 
-from SilverLingua.core.agent import Agent
-from SilverLingua.core.atoms import Idearium, Tool
+from SilverLingua.core.atoms import Tool
+from SilverLingua.core.organisms import Idearium
+from SilverLingua.core.templates.agent import Agent
 
-from ..atoms import OpenAIModel
-from ..atoms.model.util import CompletionParams, OpenAIChatModelName
+from ..model import OpenAIModel
+from ..model.util import CompletionParams, OpenAIChatModelName
 
 logger = logging.getLogger(__name__)
 
