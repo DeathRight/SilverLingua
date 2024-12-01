@@ -1,3 +1,13 @@
+"""
+The OpenAI module provides implementations of SilverLingua's core components
+using the OpenAI API.
+
+This module includes:
+- OpenAIChatAgent: An agent that uses OpenAI's chat completion API
+- OpenAIModel: A model that uses OpenAI's API
+- OpenAIChatRole: Role definitions for OpenAI's chat format
+"""
+
 import logging
 
 from SilverLingua import Module
