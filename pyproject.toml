@@ -18,6 +18,7 @@ pytest-asyncio = "^0.23.5"
 pytest-cov = "^4.1.0"
 pytest-dependency = "^0.5.1"
 anthropic = "^0.40.0"
+mkdocstrings = {extras = ["python"], version = "^0.27.0"}
 
 [tool.poetry.scripts]
 test = "pytest:main"
@@ -31,6 +32,11 @@ test-anthropic = "pytest:main tests/anthropic -v"
 test-verbose = "pytest:main -v"
 test-watch = "pytest:main -f -v"
 test-cov = "pytest:main --cov=src/SilverLingua"
+
+[tool.poetry.group.dev.dependencies]
+mkdocs = "^1.6.1"
+mkdocs-material = "^9.5.47"
+mkdocstrings = {extras = ["python"], version = "^0.27.0"}
 
 [tool.pytest.ini_options]
 addopts = "-v -ra -q"

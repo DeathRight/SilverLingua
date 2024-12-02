@@ -2,6 +2,13 @@ from ....util import ImmutableAttributeError
 
 
 class RoleMember:
+    """
+    Used in ChatRole and ReactRole.
+
+    Warning:
+        **Do not** instantiate this class directly. See [ChatRole][SilverLingua.core.atoms.role.chat.ChatRole] and [ReactRole][SilverLingua.core.atoms.role.react.ReactRole] for more information.
+    """
+
     def __init__(self, name, value, parent=None):
         self.__dict__["_name"] = name
         self.__dict__["_value"] = value

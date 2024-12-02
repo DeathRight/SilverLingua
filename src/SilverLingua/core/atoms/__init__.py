@@ -1,5 +1,5 @@
 from .memory import Memory
-from .prompt import prompt
+from .prompt import RolePrompt, prompt
 from .role import ChatRole, ReactRole, create_chat_role, create_react_role
 from .tokenizer import Tokenizer
 from .tool import (
@@ -17,6 +17,7 @@ __all__ = [
     "Memory",
     # Prompt
     "prompt",
+    "RolePrompt",
     # Role
     "ChatRole",
     "ReactRole",

@@ -1,0 +1,84 @@
+site_name: SilverLingua
+site_description: A framework for building AI agents
+repo_url: https://github.com/DeathRight/SilverLingua
+repo_name: DeathRight/SilverLingua
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: ["src"]
+          import:
+            - https://docs.python.org/3/objects.inv
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_root_full_path: false
+            heading_level: 1
+            docstring_style: google
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            line_length: 10
+            members_order: source
+            show_if_no_docstring: true
+            filters: ["!^_"]
+            merge_init_into_class: true
+            docstring_style: google
+            inherited_members: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - API Reference:
+      - Overview: api/index.md
+      - Configuration: api/config.md
+      - Core:
+          - Decorators: api/core/decorators.md
+          - Atoms: api/core/atoms.md
+          - Molecules: api/core/molecules.md
+          - Organisms: api/core/organisms.md
+          - Templates: api/core/templates.md
+      - Providers:
+          - OpenAI: api/providers/openai.md
+          - Anthropic: api/providers/anthropic.md
+
+markdown_extensions:
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+watch:
+  - src/SilverLingua
