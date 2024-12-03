@@ -27,6 +27,7 @@ theme:
     - navigation.top
     - toc.follow
     - content.code.copy
+  custom_dir: docs/stylesheets
 
 plugins:
   - search
@@ -52,7 +53,7 @@ plugins:
             line_length: 10
             members_order: source
             show_if_no_docstring: true
-            filters: ["!^_"]
+            filters: ["^[^_]|^_[^_]"]
             merge_init_into_class: true
             docstring_style: google
             inherited_members: true
@@ -63,22 +64,44 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
   - API Reference:
-      - Overview: api/index.md
-      - Configuration: api/config.md
-      - Core:
-          - Decorators: api/core/decorators.md
-          - Atoms: api/core/atoms.md
-          - Molecules: api/core/molecules.md
-          - Organisms: api/core/organisms.md
-          - Templates: api/core/templates.md
-      - Providers:
-          - OpenAI: api/providers/openai.md
-          - Anthropic: api/providers/anthropic.md
+      - SilverLingua:
+        - config: api/config.md
+        - core:
+          - atoms:
+            - index: api/core/atoms/index.md
+            - Memory: api/core/atoms/memory.md
+            - Prompt: api/core/atoms/prompt.md
+            - Role: api/core/atoms/role.md
+            - Tokenizer: api/core/atoms/tokenizer.md
+            - Tool: api/core/atoms/tool.md
+          - molecules:
+            - index: api/core/molecules/index.md
+            - Link: api/core/molecules/link.md
+            - Notion: api/core/molecules/notion.md
+          - organisms:
+            - index: api/core/organisms/index.md
+            - Idearium: api/core/organisms/idearium.md
+          - templates:
+            - index: api/core/templates/index.md
+            - Agent: api/core/templates/agent.md
+            - Model: api/core/templates/model.md
+        - Modules:
+            - OpenAI: api/modules/openai.md
+            - Anthropic: api/modules/anthropic.md
 
 markdown_extensions:
   - toc:
       permalink: true
       toc_depth: 3
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
 
 watch:
   - src/SilverLingua
+
+extra_css:
+  - stylesheets/extra.css

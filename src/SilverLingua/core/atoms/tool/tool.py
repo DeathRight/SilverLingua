@@ -11,7 +11,7 @@ from .util import (
 
 
 class Tool(BaseModel):
-    """
+    r"""
     A wrapper class for functions that allows them to be both directly callable
     and serializable to JSON for use with an LLM.
 
@@ -34,15 +34,17 @@ class Tool(BaseModel):
 
         # Serialize to JSON
         serialized = str(tool_instance)
-        ```
 
-    Alternatively, you can call the function using a ToolCallFunction object.
-        ```python
-        # Create a FunctionCall object
-        function_call = FunctionCall("my_function", {"x": 1, "y": 2})
+        ####
+        # Alternatively, you can use the decorator to turn a function into a Tool.
+        ####
 
-        # Call the function using the FunctionCall object
-        result = tool_instance(function_call)  # Output will be 3
+        @tool
+        def my_function(x, y):
+            return x + y
+
+        # Now the function itself is already a Tool.
+        result = my_function(1, 2)  # Output will be 3
         ```
     """
 
@@ -79,8 +81,6 @@ class Tool(BaseModel):
 
     def __init__(self, function: Callable):
         """
-        Creates a new Tool instance from the given function.
-
         Args:
             function (Callable): The function to be turned into a Tool.
         """

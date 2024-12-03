@@ -1,0 +1,1 @@
+::: SilverLingua.core.organisms.idearium
