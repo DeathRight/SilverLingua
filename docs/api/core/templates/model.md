@@ -1,1 +1,1 @@
-::: SilverLingua.core.templates.model
+::: silverlingua.core.templates.model

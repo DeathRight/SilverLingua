@@ -11,8 +11,8 @@ class Link(Memory):
     A memory that can have a parent and children Links,
     forming a hierarchical structure of interconnected memories.
 
-    The content can be either a Notion or a Memory.
-    (You can still use the content as a string via str(link.content).
+    The content can be either a [`Notion`][silverlingua.core.molecules.notion.Notion] or a [`Memory`][silverlingua.core.atoms.memory.Memory].
+    (You can still use the content as a string via `str(link.content)`.)
     """
 
     content: Union[Notion, Memory]

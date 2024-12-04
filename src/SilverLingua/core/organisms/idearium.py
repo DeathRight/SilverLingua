@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Idearium(BaseModel):
     """
-    A collection of `Notions` that is automatically trimmed to fit within a maximum
+    A collection of [`Notions`][silverlingua.core.molecules.notion.Notion] that is automatically trimmed to fit within a maximum
     number of tokens.
     """
 

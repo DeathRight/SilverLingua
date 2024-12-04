@@ -10,7 +10,8 @@ This module includes:
 
 import logging
 
-from ..config import Module
+from silverlingua import Module
+
 from .atoms import AnthropicChatRole
 from .templates.agent import AnthropicChatAgent
 from .templates.model import AnthropicModel

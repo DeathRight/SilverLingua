@@ -9,7 +9,7 @@ class ChatRole(Enum):
     Standardized roles for chat messages.
 
     Warning:
-        **Do not** instantiate this enum directly. Use [`create_chat_role()`][SilverLingua.core.atoms.role.chat.create_chat_role] instead.
+        **Do not** instantiate this enum directly. Use [`create_chat_role()`][silverlingua.core.atoms.role.chat.create_chat_role] instead.
     """
 
     SYSTEM = RoleMember("SYSTEM", "SYSTEM")

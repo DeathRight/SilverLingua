@@ -21,6 +21,10 @@ class Tool(BaseModel):
             according to JSON schema standards.
         name (str): The name of the function, extracted from the FunctionJSONSchema.
 
+    See also:
+        - [`Agent`][silverlingua.core.templates.agent.Agent]
+        - [`Model`][silverlingua.core.templates.model.Model]
+
     Example:
         ```python
         def my_function(x, y):

@@ -1,1 +1,1 @@
-::: SilverLingua.core.atoms
+::: silverlingua.core.atoms

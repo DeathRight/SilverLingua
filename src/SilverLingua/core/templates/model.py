@@ -34,27 +34,32 @@ class Model(BaseModel, ABC):
     and post-processing. The lifecycle is as follows:
 
     Lifecycle:
-    1. Pre-processing (_preprocess): Performs any necessary transformations or
-        adjustments to the messages prior to trimming or preparing them for model input.
-        (Optional)
+        1. **Pre-processing ([`_preprocess`][silverlingua.core.templates.model.Model._preprocess]):** Performs any necessary transformations or
+            adjustments to the messages prior to trimming or preparing them for model input.
+            <span style="color:var(--md-accent-fg-color)">*(Optional)*</span>
 
-    2. Preparing Request (_format_request): Converts the pre-processed messages
-        into a format suitable for model input.
+        2. **Preparing Request ([`_format_request`][silverlingua.core.templates.model.Model._format_request]):** Converts the pre-processed messages
+            into a format suitable for model input.
 
-    3. Model Invocation (_call or _acall): Feeds the prepared input to the LLM and
-        retrieves the raw model output. There should be both synchronous and
-        asynchronous versions available.
+        3. **Model Invocation ([`_call`][silverlingua.core.templates.model.Model._call] or [`_acall`][silverlingua.core.templates.model.Model._acall]):** Feeds the prepared input to the LLM and
+            retrieves the raw model output. There should be both synchronous and
+            asynchronous versions available.
 
-    4. Standardizing Response (_standardize_response): Transforms the raw model
-        output into a consistent response format suitable for further processing or
-        delivery.
+        4. **Standardizing Response ([`_standardize_response`][silverlingua.core.templates.model.Model._standardize_response]):** Transforms the raw model
+            output into a consistent response format suitable for further processing or
+            delivery.
 
-    5. Post-processing (_postprocess): Performs any final transformations or
-        adjustments to the standardized responses, making them ready for delivery.
-        (Optional)
+        5. **Post-processing ([`_postprocess`][silverlingua.core.templates.model.Model._postprocess]):** Performs any final transformations or
+            adjustments to the standardized responses, making them ready for delivery.
+            <span style="color:var(--md-accent-fg-color)">*(Optional)*</span>
 
     Subclasses should implement each of the non-optional lifecycle steps in accordance
     with the specific requirements and behaviors of the target LLM.
+
+    See also:
+        - [`Agent`][silverlingua.core.templates.agent.Agent]
+        - [`Idearium`][silverlingua.core.organisms.idearium.Idearium]
+        - [`Notion`][silverlingua.core.molecules.notion.Notion]
     """
 
     model_config = ConfigDict(frozen=True)

@@ -1,1 +1,1 @@
-::: SilverLingua.core.organisms.idearium
+::: silverlingua.core.organisms.idearium

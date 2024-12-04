@@ -5,10 +5,19 @@ from .member import RoleMember
 
 
 class ReactRole(Enum):
-    THOUGHT = RoleMember("THOUGHT", "THOUGHT")
-    OBSERVATION = RoleMember("OBSERVATION", "OBSERVATION")
-    ACTION = RoleMember("ACTION", "ACTION")
+    """
+    Standardized roles for ReAct framework to help with chain-of-thought prompting.
+
+    See: [https://www.promptingguide.ai/techniques/react](https://www.promptingguide.ai/techniques/react)
+
+    Warning:
+        **Do not** instantiate this enum directly. Use [`create_react_role()`][silverlingua.core.atoms.role.react.create_react_role] instead.
+    """
+
     QUESTION = RoleMember("QUESTION", "QUESTION")
+    THOUGHT = RoleMember("THOUGHT", "THOUGHT")
+    ACTION = RoleMember("ACTION", "ACTION")
+    OBSERVATION = RoleMember("OBSERVATION", "OBSERVATION")
     ANSWER = RoleMember("ANSWER", "ANSWER")
 
     def __eq__(self, other):
@@ -24,19 +33,19 @@ for member in ReactRole:
 
 def create_react_role(
     name: str,
-    THOUGHT: str,
-    OBSERVATION: str,
-    ACTION: str,
     QUESTION: str,
+    THOUGHT: str,
+    ACTION: str,
+    OBSERVATION: str,
     ANSWER: str,
 ) -> Type[ReactRole]:
     return Enum(
         name,
         {
-            "THOUGHT": RoleMember("THOUGHT", THOUGHT, ReactRole),
-            "OBSERVATION": RoleMember("OBSERVATION", OBSERVATION, ReactRole),
-            "ACTION": RoleMember("ACTION", ACTION, ReactRole),
             "QUESTION": RoleMember("QUESTION", QUESTION, ReactRole),
+            "THOUGHT": RoleMember("THOUGHT", THOUGHT, ReactRole),
+            "ACTION": RoleMember("ACTION", ACTION, ReactRole),
+            "OBSERVATION": RoleMember("OBSERVATION", OBSERVATION, ReactRole),
             "ANSWER": RoleMember("ANSWER", ANSWER, ReactRole),
         },
     )

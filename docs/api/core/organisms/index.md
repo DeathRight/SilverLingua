@@ -1,1 +1,1 @@
-::: SilverLingua.core.organisms
+::: silverlingua.core.organisms

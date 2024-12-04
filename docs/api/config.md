@@ -1,1 +1,1 @@
-::: SilverLingua.config
+::: silverlingua.config

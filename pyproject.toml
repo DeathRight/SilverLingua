@@ -3,7 +3,7 @@ name = "SilverLingua"
 version = "0.1.0"
 description = "An AI agent framework"
 authors = ["Travis Baldwin <travis@voidtavern.dev>"]
-packages = [{include = "SilverLingua", from = "src"}]
+packages = [{include = "silverlingua", from = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11.0,<3.12"
@@ -31,7 +31,7 @@ test-openai = "pytest:main tests/openai -v"
 test-anthropic = "pytest:main tests/anthropic -v"
 test-verbose = "pytest:main -v"
 test-watch = "pytest:main -f -v"
-test-cov = "pytest:main --cov=src/SilverLingua"
+test-cov = "pytest:main --cov=src/silverlingua"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs = "^1.6.1"

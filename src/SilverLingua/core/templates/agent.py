@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class Agent(BaseModel):
     """
-    A wrapper around a model that utilizes an Idearium and a set of Tools.
+    A wrapper around a [`Model`][silverlingua.core.templates.model.Model] that utilizes an [`Idearium`][silverlingua.core.organisms.idearium.Idearium] and a set of [`Tool`][silverlingua.core.atoms.tool.tool.Tool]s.
 
     This is a base class not meant to be used directly. It is meant to be
     subclassed by specific model implementations.
@@ -38,8 +38,9 @@ class Agent(BaseModel):
     """
     The tools used by the agent.
 
-    WARNING: Do not modify this list directly. Use `add_tool`, `add_tools`,
-    and `remove_tool` instead.
+    Warning:
+        **Do not** modify this list directly. Use `add_tool`, `add_tools`,
+        and `remove_tool` instead.
     """
     auto_append_response: bool = True
     """

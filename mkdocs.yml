@@ -53,13 +53,14 @@ plugins:
             line_length: 10
             members_order: source
             show_if_no_docstring: true
-            filters: ["^[^_]|^_[^_]"]
+            filters: ["^(?!logger)[^_]|^_[^_]"]
             merge_init_into_class: true
             docstring_style: google
             inherited_members: true
 
 nav:
   - Home: index.md
+  - Design Principles: design-principles.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md

@@ -9,8 +9,8 @@ from ..atoms.role import ChatRole, ReactRole
 class Notion(Memory):
     """
     A memory that stores the role associated with its content.
-    The role is usually a `ChatRole` or a `ReactRole`.
-    (See `atoms/roles`)
+    The role is usually a [`ChatRole`][silverlingua.core.atoms.role.chat.ChatRole] or a [`ReactRole`][silverlingua.core.atoms.role.react.ReactRole].
+    (See [`atoms/roles`][silverlingua.core.atoms.role])
 
     Attributes:
         role: The role of the notion.

@@ -1,6 +1,6 @@
 # API Reference
 
-::: SilverLingua
+::: silverlingua
 options:
 show_root_heading: true
 show_source: true

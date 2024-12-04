@@ -6,7 +6,7 @@ class RoleMember:
     Used in ChatRole and ReactRole.
 
     Warning:
-        **Do not** instantiate this class directly. See [ChatRole][SilverLingua.core.atoms.role.chat.ChatRole] and [ReactRole][SilverLingua.core.atoms.role.react.ReactRole] for more information.
+        **Do not** instantiate this class directly. See [ChatRole][silverlingua.core.atoms.role.chat.ChatRole] and [ReactRole][silverlingua.core.atoms.role.react.ReactRole] for more information.
     """
 
     def __init__(self, name, value, parent=None):

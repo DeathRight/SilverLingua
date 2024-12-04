@@ -1,1 +1,1 @@
-::: SilverLingua.core.atoms.role
+::: silverlingua.core.atoms.role
