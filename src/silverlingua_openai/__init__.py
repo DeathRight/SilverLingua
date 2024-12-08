@@ -10,7 +10,7 @@ This module includes:
 
 import logging
 
-from SilverLingua import Module
+from silverlingua import Module
 
 from .atoms import OpenAIChatRole
 from .templates.agent import OpenAIChatAgent

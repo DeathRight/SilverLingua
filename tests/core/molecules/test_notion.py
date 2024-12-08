@@ -1,7 +1,7 @@
 import pytest
 
-from SilverLingua.core.atoms import ChatRole, ReactRole
-from SilverLingua.core.molecules import Notion
+from silverlingua.core.atoms import ChatRole, ReactRole
+from silverlingua.core.molecules import Notion
 
 
 @pytest.mark.core

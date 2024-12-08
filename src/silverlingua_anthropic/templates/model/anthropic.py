@@ -3,13 +3,13 @@ import logging
 import os
 from typing import Callable, List, Optional, Type, Union
 
-from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message, MessageStreamEvent
 from pydantic import ConfigDict, Field
 
-from SilverLingua.core.atoms import ChatRole, Tokenizer
-from SilverLingua.core.molecules import Notion
-from SilverLingua.core.templates.model import Messages, Model, ModelType
+from silverlingua.core.atoms import ChatRole, Tokenizer
+from silverlingua.core.molecules import Notion
+from silverlingua.core.templates.model import Messages, Model, ModelType
+from silverlingua_anthropic import Anthropic, AsyncAnthropic
 
 from ...atoms import AnthropicChatRole
 from .util import AnthropicModelName, AnthropicModels, CompletionParams

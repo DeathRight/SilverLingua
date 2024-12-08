@@ -1,42 +1,53 @@
 [tool.poetry]
-name = "SilverLingua"
+name = "silverlingua"
 version = "0.1.0"
 description = "An AI agent framework"
 authors = ["Travis Baldwin <travis@voidtavern.dev>"]
-packages = [{include = "silverlingua", from = "src"}]
+packages = [
+    {include = "silverlingua", from = "src"},
+    {include = "silverlingua_openai", from = "src"},
+    {include = "silverlingua_anthropic", from = "src"}
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11.0,<3.12"
 jinja2 = "3.1.2"
 loguru = "0.7.2"
-openai = "^1.3.5"
 tiktoken = "^0.5.1"
 python-dotenv = "^1.0.0"
 pydantic = "^2.5.2"
+
+# Optional provider dependencies
+openai = {version = "^1.3.5", optional = true}
+anthropic = {version = "^0.40.0", optional = true}
+
+[tool.poetry.extras]
+openai = ["openai"]
+anthropic = ["anthropic"]
+all = ["openai", "anthropic"]
+
+[tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
 pytest-asyncio = "^0.23.5"
 pytest-cov = "^4.1.0"
 pytest-dependency = "^0.5.1"
-anthropic = "^0.40.0"
+mkdocs = "^1.6.1"
+mkdocs-material = "^9.5.47"
 mkdocstrings = {extras = ["python"], version = "^0.27.0"}
 
 [tool.poetry.scripts]
 test = "pytest:main"
-test-core = "pytest:main tests/core/test_core.py -v"
-test-atoms = "pytest:main tests/core/atoms -v"
-test-molecules = "pytest:main tests/core/molecules -v"
-test-organisms = "pytest:main tests/core/organisms -v"
-test-templates = "pytest:main tests/core/templates -v"
-test-openai = "pytest:main tests/openai -v"
-test-anthropic = "pytest:main tests/anthropic -v"
-test-verbose = "pytest:main -v"
-test-watch = "pytest:main -f -v"
-test-cov = "pytest:main --cov=src/silverlingua"
-
-[tool.poetry.group.dev.dependencies]
-mkdocs = "^1.6.1"
-mkdocs-material = "^9.5.47"
-mkdocstrings = {extras = ["python"], version = "^0.27.0"}
+# test-core = "pytest tests/core/test_core.py -v"
+# test-atoms = "pytest tests/core/atoms -v"
+# test-molecules = "pytest tests/core/molecules -v"
+# test-organisms = "pytest tests/core/organisms -v"
+# test-templates = "pytest tests/core/templates -v"
+# test-openai = "pytest tests/openai -v"
+# test-anthropic = "pytest tests/anthropic -v"
+# test-all = "pytest -v"
+# test-verbose = "pytest -v"
+# test-watch = "pytest -f -v"
+# test-cov = "pytest --cov=src/silverlingua"
 
 [tool.pytest.ini_options]
 addopts = "-v -ra -q"
@@ -53,7 +64,7 @@ markers = [
     # Specific component types
     "memory: memory component tests",
     "tokenizer: tokenizer component tests",
-    "tool: tool component tests",
+    "tool: tool component tests", 
     "prompt: prompt component tests",
     "role: role component tests",
     "notion: notion component tests",
@@ -61,9 +72,6 @@ markers = [
     "idearium: idearium component tests",
     "model: model component tests",
     "agent: agent component tests",
-    # Provider-specific tests
-    "openai: OpenAI implementation tests",
-    "anthropic: Anthropic implementation tests",
     # Test types
     "unit: unit tests",
     "integration: integration tests",

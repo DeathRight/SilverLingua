@@ -5,9 +5,9 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 
-from SilverLingua.core.atoms import Tool
-from SilverLingua.core.organisms import Idearium
-from SilverLingua.core.templates.agent import Agent
+from silverlingua.core.atoms import Tool
+from silverlingua.core.organisms import Idearium
+from silverlingua.core.templates.agent import Agent
 
 from ..model import OpenAIModel
 from ..model.util import CompletionParams, OpenAIChatModelName

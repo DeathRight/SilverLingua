@@ -1,6 +1,6 @@
 import pytest
 
-from SilverLingua.core.atoms.prompt import RolePrompt, prompt
+from silverlingua.core.atoms.prompt import RolePrompt, prompt
 
 
 @pytest.mark.core

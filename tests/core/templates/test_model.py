@@ -2,9 +2,9 @@ from typing import Generator, List, Union
 
 import pytest
 
-from SilverLingua.core.atoms import ChatRole, Tokenizer
-from SilverLingua.core.molecules import Notion
-from SilverLingua.core.templates.model import Messages, Model, ModelType
+from silverlingua.core.atoms import ChatRole, Tokenizer
+from silverlingua.core.molecules import Notion
+from silverlingua.core.templates.model import Messages, Model, ModelType
 
 
 class MockTokenizer(Tokenizer):

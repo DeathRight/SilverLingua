@@ -1,6 +1,6 @@
 import logging
 
-from SilverLingua import Module
+from silverlingua import Module
 
 from .google_search import google_search
 

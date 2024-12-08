@@ -3,7 +3,7 @@ import os
 
 import requests
 
-from SilverLingua.core.atoms.tool import Tool
+from silverlingua.core.atoms.tool import Tool
 
 url = "https://google.serper.dev/"
 

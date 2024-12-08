@@ -2,14 +2,14 @@ import json
 
 import pytest
 
-from SilverLingua.core.atoms import (
+from silverlingua.core.atoms import (
     Tool,
     ToolCall,
     ToolCallFunction,
     ToolCalls,
 )
-from SilverLingua.core.molecules import Notion
-from SilverLingua.core.templates.agent import Agent
+from silverlingua.core.molecules import Notion
+from silverlingua.core.templates.agent import Agent
 
 from .test_model import MockModel
 

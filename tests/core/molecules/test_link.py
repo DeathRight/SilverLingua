@@ -1,7 +1,7 @@
 import pytest
 
-from SilverLingua.core.atoms import Memory
-from SilverLingua.core.molecules import Link, Notion
+from silverlingua.core.atoms import Memory
+from silverlingua.core.molecules import Link, Notion
 
 
 @pytest.mark.core

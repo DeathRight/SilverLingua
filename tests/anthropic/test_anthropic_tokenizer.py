@@ -1,12 +1,12 @@
 import os
 
 import pytest
-from anthropic import Anthropic
 from dotenv import load_dotenv
 
-from SilverLingua.anthropic.templates.model.tokenizer import AnthropicTokenizer
-from SilverLingua.core.molecules.notion import Notion
-from SilverLingua.core.organisms import Idearium
+from silverlingua.core.molecules.notion import Notion
+from silverlingua.core.organisms import Idearium
+from silverlingua_anthropic import Anthropic
+from silverlingua_anthropic.templates.model.tokenizer import AnthropicTokenizer
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,6 +29,7 @@ def tokenizer(anthropic_client):
     return AnthropicTokenizer(client=anthropic_client, model="claude-3-opus-20240229")
 
 
+@pytest.mark.anthropic
 def test_tokenizer_encode(tokenizer):
     """Test basic encoding functionality."""
     text = "Hello, world!"
@@ -43,6 +44,7 @@ def test_tokenizer_encode(tokenizer):
     assert tokens == cached_tokens
 
 
+@pytest.mark.anthropic
 def test_tokenizer_encode_long(tokenizer):
     """Test encoding a long text."""
     long_text = "This is a very long text that should exceed our token limit. " * 50
@@ -52,6 +54,7 @@ def test_tokenizer_encode_long(tokenizer):
     assert len(tokens) > 0
 
 
+@pytest.mark.anthropic
 def test_tokenizer_decode(tokenizer):
     """Test basic decoding functionality."""
     text = "Hello, world!"
@@ -62,6 +65,7 @@ def test_tokenizer_decode(tokenizer):
     assert decoded == text
 
 
+@pytest.mark.anthropic
 def test_tokenizer_partial_decode(tokenizer):
     """Test decoding of partial token sequences."""
     text = "This is a test of partial decoding capabilities."
@@ -76,6 +80,7 @@ def test_tokenizer_partial_decode(tokenizer):
     assert isinstance(decoded, str)
 
 
+@pytest.mark.anthropic
 def test_tokenizer_cache(tokenizer):
     """Test the tokenizer's caching behavior."""
     text1 = "First test string"
@@ -93,6 +98,7 @@ def test_tokenizer_cache(tokenizer):
     assert tokenizer.encode(text2) == tokens2
 
 
+@pytest.mark.anthropic
 def test_tokenizer_with_idearium(tokenizer):
     """Test the tokenizer works with Idearium."""
     idearium = Idearium(

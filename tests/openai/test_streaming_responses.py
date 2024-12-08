@@ -3,11 +3,11 @@ import os
 from typing import List
 
 import pytest
-from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
 
-from SilverLingua.core.atoms.tool import Tool
+from silverlingua.core.atoms.tool import Tool
+from silverlingua_anthropic import AsyncAnthropic
+from silverlingua_openai import AsyncOpenAI
 
 # Load environment variables
 load_dotenv()
@@ -61,6 +61,7 @@ async def anthropic_client() -> AsyncAnthropic:
 
 
 @pytest.mark.asyncio
+@pytest.mark.anthropic
 async def test_openai_streaming_parallel_tools(
     openai_client: AsyncOpenAI, tools: List[Tool]
 ):

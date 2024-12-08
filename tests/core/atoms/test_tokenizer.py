@@ -3,7 +3,7 @@ from typing import List
 import pytest
 from pydantic import ValidationError
 
-from SilverLingua.core.atoms import Tokenizer
+from silverlingua.core.atoms import Tokenizer
 
 
 def test_tokenizer_initialization():

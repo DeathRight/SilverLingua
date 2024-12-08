@@ -1,9 +1,9 @@
 import logging
 from typing import List, Optional
 
-from SilverLingua.core.atoms import Tool
-from SilverLingua.core.organisms import Idearium
-from SilverLingua.core.templates.agent import Agent
+from silverlingua.core.atoms import Tool
+from silverlingua.core.organisms import Idearium
+from silverlingua.core.templates.agent import Agent
 
 from ..model import AnthropicModel
 from ..model.util import AnthropicModelName, CompletionParams

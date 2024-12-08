@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from SilverLingua.core.atoms import Memory
+from silverlingua.core.atoms import Memory
 
 
 @pytest.mark.core

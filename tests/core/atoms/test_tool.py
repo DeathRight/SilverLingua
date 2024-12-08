@@ -3,7 +3,7 @@ from typing import Optional
 
 import pytest
 
-from SilverLingua.core.atoms.tool import (
+from silverlingua.core.atoms.tool import (
     Tool,
     ToolCall,
     ToolCallFunction,

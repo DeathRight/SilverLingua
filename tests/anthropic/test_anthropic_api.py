@@ -2,8 +2,9 @@ import asyncio
 import os
 
 import pytest
-from anthropic import Anthropic, AsyncAnthropic
 from dotenv import load_dotenv
+
+from silverlingua_anthropic import Anthropic, AsyncAnthropic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,6 +28,7 @@ async def async_anthropic_client():
     return AsyncAnthropic(api_key=api_key)
 
 
+@pytest.mark.anthropic
 def test_standard_completion(anthropic_client):
     """Test standard completion without streaming or tool calls"""
     response = anthropic_client.messages.create(
@@ -38,6 +40,7 @@ def test_standard_completion(anthropic_client):
     assert "Paris" in response.content[0].text
 
 
+@pytest.mark.anthropic
 def test_standard_completion_with_tool(anthropic_client):
     """Test standard completion with tool calls"""
     tools = [
@@ -70,6 +73,7 @@ def test_standard_completion_with_tool(anthropic_client):
     # Note: We'll need to verify the exact structure of tool calls in Anthropic's response
 
 
+@pytest.mark.anthropic
 async def test_streaming_completion(async_anthropic_client):
     """Test streaming completion without tool calls"""
     stream = await async_anthropic_client.messages.create(
@@ -89,6 +93,7 @@ async def test_streaming_completion(async_anthropic_client):
     assert any(str(i) in full_response for i in range(1, 6))
 
 
+@pytest.mark.anthropic
 async def test_streaming_completion_with_tool(async_anthropic_client):
     """Test streaming completion with tool calls"""
     tools = [
@@ -140,6 +145,7 @@ async def test_streaming_completion_with_tool(async_anthropic_client):
     assert len(collected_content) > 0 or len(tool_calls) > 0
 
 
+@pytest.mark.anthropic
 async def test_parallel_completions(async_anthropic_client):
     """Test parallel completion requests"""
 

@@ -4,7 +4,7 @@ from typing import Dict, List
 from anthropic import Anthropic
 from pydantic import ConfigDict
 
-from ....core.atoms.tokenizer import Tokenizer
+from silverlingua.core.atoms import Tokenizer
 
 logger = logging.getLogger(__name__)
 

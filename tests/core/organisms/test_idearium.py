@@ -1,8 +1,8 @@
 import pytest
 
-from SilverLingua.core.atoms import ChatRole, Tokenizer
-from SilverLingua.core.molecules import Notion
-from SilverLingua.core.organisms import Idearium
+from silverlingua.core.atoms import ChatRole, Tokenizer
+from silverlingua.core.molecules import Notion
+from silverlingua.core.organisms import Idearium
 
 
 class MockTokenizer(Tokenizer):

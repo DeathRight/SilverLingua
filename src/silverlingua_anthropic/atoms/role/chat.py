@@ -1,4 +1,4 @@
-from SilverLingua.core.atoms import create_chat_role
+from silverlingua.core.atoms import create_chat_role
 
 AnthropicChatRole = create_chat_role(
     "AnthropicChatRole",

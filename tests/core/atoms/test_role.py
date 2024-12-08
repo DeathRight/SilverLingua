@@ -1,13 +1,13 @@
 import pytest
 
-from SilverLingua.core.atoms.role import (
+from silverlingua.core.atoms.role import (
     ChatRole,
     ReactRole,
     RoleMember,
     create_chat_role,
     create_react_role,
 )
-from SilverLingua.util import ImmutableAttributeError
+from silverlingua.util import ImmutableAttributeError
 
 
 @pytest.mark.core
