@@ -110,7 +110,6 @@ def model():
 @pytest.mark.templates
 @pytest.mark.model
 @pytest.mark.unit
-@pytest.mark.dependency()
 def test_model_initialization(model):
     """Test basic model initialization."""
     assert model.api_key == "mock-api-key"

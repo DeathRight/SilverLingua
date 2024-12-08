@@ -1,9 +1,7 @@
 import logging
 from typing import List, Optional
 
-from openai.types.chat import (
-    ChatCompletionToolParam,
-)
+from openai.types.chat.chat_completion_create_params import ChatCompletionToolParam
 
 from silverlingua.core.atoms import Tool
 from silverlingua.core.organisms import Idearium

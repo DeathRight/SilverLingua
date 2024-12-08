@@ -5,28 +5,34 @@ from dotenv import load_dotenv
 
 from silverlingua.core.molecules.notion import Notion
 from silverlingua.core.organisms import Idearium
-from silverlingua_anthropic import Anthropic
-from silverlingua_anthropic.templates.model.tokenizer import AnthropicTokenizer
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Skip these tests if ANTHROPIC_API_KEY is not set
-pytestmark = pytest.mark.skipif(
-    os.getenv("ANTHROPIC_API_KEY") is None,
-    reason="ANTHROPIC_API_KEY environment variable is not set",
-)
 
 
 @pytest.fixture
 def anthropic_client():
     api_key = os.getenv("ANTHROPIC_API_KEY")
-    return Anthropic(api_key=api_key)
+    if not api_key:
+        pytest.skip("ANTHROPIC_API_KEY not set")
+    try:
+        from silverlingua_anthropic import Anthropic
+
+        return Anthropic(api_key=api_key)
+    except ImportError:
+        pytest.skip("Anthropic package not installed")
 
 
 @pytest.fixture
 def tokenizer(anthropic_client):
-    return AnthropicTokenizer(client=anthropic_client, model="claude-3-opus-20240229")
+    try:
+        from silverlingua_anthropic.templates.model.tokenizer import AnthropicTokenizer
+
+        return AnthropicTokenizer(
+            client=anthropic_client, model="claude-3-opus-20240229"
+        )
+    except ImportError:
+        pytest.skip("Anthropic package not installed")
 
 
 @pytest.mark.anthropic

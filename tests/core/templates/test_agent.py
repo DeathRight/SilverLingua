@@ -10,8 +10,23 @@ from silverlingua.core.atoms import (
 )
 from silverlingua.core.molecules import Notion
 from silverlingua.core.templates.agent import Agent
+from silverlingua.core.templates.model import ModelType
 
 from .test_model import MockModel
+
+
+@pytest.mark.core
+@pytest.mark.templates
+@pytest.mark.model
+@pytest.mark.unit
+def test_model_first():
+    """Test model initialization first."""
+    model = MockModel()
+    assert model.api_key == "mock-api-key"
+    assert model.name == "mock-model"
+    assert model.type == ModelType.CHAT
+    assert model.can_stream is True
+    assert model.max_tokens == 100
 
 
 def mock_tool_function(x: int) -> int:
@@ -34,7 +49,6 @@ def agent(mock_tool):
 @pytest.mark.templates
 @pytest.mark.agent
 @pytest.mark.unit
-@pytest.mark.dependency(depends=["test_model_initialization"])
 def test_agent_initialization(agent, mock_tool):
     """Test basic agent initialization."""
     assert agent.model is not None

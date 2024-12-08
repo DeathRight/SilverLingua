@@ -6,15 +6,12 @@ import pytest
 from dotenv import load_dotenv
 
 from silverlingua.core.atoms.tool import Tool
-from silverlingua_anthropic import AsyncAnthropic
-from silverlingua_openai import AsyncOpenAI
 
 # Load environment variables
 load_dotenv()
 
 # Get API keys from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 
 def sample_tool(x: int) -> int:
@@ -45,26 +42,21 @@ def tools() -> List[Tool]:
 
 
 @pytest.fixture
-async def openai_client() -> AsyncOpenAI:
+async def openai_client():
     """Fixture providing OpenAI client."""
     if not OPENAI_API_KEY:
         pytest.skip("OPENAI_API_KEY not set")
-    return AsyncOpenAI(api_key=OPENAI_API_KEY)
+    try:
+        from silverlingua_openai import AsyncOpenAI
 
-
-@pytest.fixture
-async def anthropic_client() -> AsyncAnthropic:
-    """Fixture providing Anthropic client."""
-    if not ANTHROPIC_API_KEY:
-        pytest.skip("ANTHROPIC_API_KEY not set")
-    return AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        return AsyncOpenAI(api_key=OPENAI_API_KEY)
+    except ImportError:
+        pytest.skip("OpenAI package not installed")
 
 
 @pytest.mark.asyncio
-@pytest.mark.anthropic
-async def test_openai_streaming_parallel_tools(
-    openai_client: AsyncOpenAI, tools: List[Tool]
-):
+@pytest.mark.openai
+async def test_openai_streaming_parallel_tools(openai_client, tools: List[Tool]):
     """Test OpenAI streaming with multiple parallel tool calls."""
     print("\nSetting up parallel tools test...")
 

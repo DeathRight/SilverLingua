@@ -35,22 +35,8 @@ mkdocs = "^1.6.1"
 mkdocs-material = "^9.5.47"
 mkdocstrings = {extras = ["python"], version = "^0.27.0"}
 
-[tool.poetry.scripts]
-test = "pytest:main"
-# test-core = "pytest tests/core/test_core.py -v"
-# test-atoms = "pytest tests/core/atoms -v"
-# test-molecules = "pytest tests/core/molecules -v"
-# test-organisms = "pytest tests/core/organisms -v"
-# test-templates = "pytest tests/core/templates -v"
-# test-openai = "pytest tests/openai -v"
-# test-anthropic = "pytest tests/anthropic -v"
-# test-all = "pytest -v"
-# test-verbose = "pytest -v"
-# test-watch = "pytest -f -v"
-# test-cov = "pytest --cov=src/silverlingua"
-
 [tool.pytest.ini_options]
-addopts = "-v -ra -q"
+addopts = "-v -ra"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
@@ -61,6 +47,9 @@ markers = [
     "molecules: mark a test as a molecular component test",
     "organisms: mark a test as an organism component test",
     "templates: mark a test as a template component test",
+    # Provider-specific tests
+    "openai: mark tests that require openai package",
+    "anthropic: mark tests that require anthropic package",
     # Specific component types
     "memory: memory component tests",
     "tokenizer: tokenizer component tests",

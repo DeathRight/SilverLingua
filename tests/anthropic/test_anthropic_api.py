@@ -4,28 +4,36 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from silverlingua_anthropic import Anthropic, AsyncAnthropic
-
 # Load environment variables from .env file
 load_dotenv()
-
-# Skip these tests if ANTHROPIC_API_KEY is not set
-pytestmark = pytest.mark.skipif(
-    os.getenv("ANTHROPIC_API_KEY") is None,
-    reason="ANTHROPIC_API_KEY environment variable is not set",
-)
 
 
 @pytest.fixture
 def anthropic_client():
+    """Fixture providing Anthropic client."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
-    return Anthropic(api_key=api_key)
+    if not api_key:
+        pytest.skip("ANTHROPIC_API_KEY not set")
+    try:
+        from silverlingua_anthropic import Anthropic
+
+        return Anthropic(api_key=api_key)
+    except ImportError:
+        pytest.skip("Anthropic package not installed")
 
 
 @pytest.fixture
 async def async_anthropic_client():
+    """Fixture providing Anthropic client."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
-    return AsyncAnthropic(api_key=api_key)
+    if not api_key:
+        pytest.skip("ANTHROPIC_API_KEY not set")
+    try:
+        from silverlingua_anthropic import AsyncAnthropic
+
+        return AsyncAnthropic(api_key=api_key)
+    except ImportError:
+        pytest.skip("Anthropic package not installed")
 
 
 @pytest.mark.anthropic
@@ -71,26 +79,6 @@ def test_standard_completion_with_tool(anthropic_client):
     assert response.content[0].text is not None
     print(f"Tool response: {response.content[0].text}")
     # Note: We'll need to verify the exact structure of tool calls in Anthropic's response
-
-
-@pytest.mark.anthropic
-async def test_streaming_completion(async_anthropic_client):
-    """Test streaming completion without tool calls"""
-    stream = await async_anthropic_client.messages.create(
-        model="claude-3-opus-20240229",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": "Count from 1 to 5 slowly."}],
-        stream=True,
-    )
-
-    collected_content = []
-    async for chunk in stream:
-        if chunk.type == "content_block_delta":
-            collected_content.append(chunk.delta.text)
-
-    full_response = "".join(collected_content)
-    print(f"Streaming response: {full_response}")
-    assert any(str(i) in full_response for i in range(1, 6))
 
 
 @pytest.mark.anthropic

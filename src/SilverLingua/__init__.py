@@ -4,9 +4,6 @@ SilverLingua - An AI agent framework
 
 import logging
 
-# Finally, import provider implementations
-from .anthropic import AnthropicChatAgent, AnthropicChatRole, AnthropicModel
-
 # First, import the config module
 from .config import Config, Module
 
@@ -25,7 +22,6 @@ from .core.atoms import (
 from .core.molecules import Link, Notion
 from .core.organisms import Idearium
 from .core.templates import Agent, Model
-from .openai import OpenAIChatAgent, OpenAIChatRole, OpenAIModel
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +43,6 @@ __all__ = [
     "Idearium",
     "Agent",
     "Model",
-    # OpenAI implementation
-    "OpenAIChatAgent",
-    "OpenAIChatRole",
-    "OpenAIModel",
-    # Anthropic implementation
-    "AnthropicChatAgent",
-    "AnthropicChatRole",
-    "AnthropicModel",
     # Configuration
     "Config",
     "Module",

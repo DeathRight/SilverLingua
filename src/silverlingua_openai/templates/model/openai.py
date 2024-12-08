@@ -23,9 +23,9 @@ from openai.types.chat.completion_create_params import (
 )
 from pydantic import ConfigDict, Field
 
-from silverlingua.core.atoms import ChatRole, Tokenizer
-from silverlingua.core.molecules import Notion
-from silverlingua.core.templates.model import Messages, Model, ModelType
+from SilverLingua.core.atoms import ChatRole, Tokenizer
+from SilverLingua.core.molecules import Notion
+from SilverLingua.core.templates.model import Messages, Model, ModelType
 from silverlingua_openai import AsyncOpenAI, OpenAI
 
 from ...atoms import OpenAIChatRole
