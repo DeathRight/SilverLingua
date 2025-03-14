@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "silverlingua"
-version = "0.1.0"
+version = "1.0.0"
 description = "An AI agent framework"
 authors = ["Travis Baldwin <travis@voidtavern.dev>"]
 packages = [
