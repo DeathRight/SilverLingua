@@ -25,7 +25,9 @@ jobs:
           
       - name: Install dependencies
         run: |
+          poetry config virtualenvs.create false
           poetry install --with dev
+          pip install -e .
           
       - name: Build and Deploy
         run: |
