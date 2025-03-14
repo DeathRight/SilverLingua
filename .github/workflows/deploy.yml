@@ -2,7 +2,7 @@ name: Deploy MkDocs
 on:
   push:
     branches:
-      - main  # or master, depending on your default branch name
+      - main
 
 permissions:
   contents: write
@@ -10,12 +10,14 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
     steps:
       - uses: actions/checkout@v4
       
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.13'  # Match your pyproject.toml
+          python-version: '3.13'
           
       - name: Install Poetry
         run: |
