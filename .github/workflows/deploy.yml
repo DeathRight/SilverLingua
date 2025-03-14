@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
+      PYTHONPATH: /home/runner/work/SilverLingua/SilverLingua/src/SilverLingua
     steps:
       - uses: actions/checkout@v4
       
@@ -25,9 +26,7 @@ jobs:
           
       - name: Install dependencies
         run: |
-          poetry config virtualenvs.create false
           poetry install --with dev
-          pip install -e .
           
       - name: Build and Deploy
         run: |
