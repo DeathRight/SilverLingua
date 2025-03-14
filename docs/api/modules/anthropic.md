@@ -1,6 +1,6 @@
 # Anthropic Provider
 
-::: silverlingua.anthropic
+::: silverlingua_anthropic
 options:
 members: true
 show_root_heading: true

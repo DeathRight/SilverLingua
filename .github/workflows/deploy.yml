@@ -1,0 +1,30 @@
+name: Deploy MkDocs
+on:
+  push:
+    branches:
+      - main  # or master, depending on your default branch name
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'  # Match your pyproject.toml
+          
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          
+      - name: Install dependencies
+        run: |
+          poetry install --with dev
+          
+      - name: Build and Deploy
+        run: |
+          poetry run mkdocs gh-deploy --force

@@ -1,6 +1,6 @@
 # OpenAI Provider
 
-::: silverlingua.openai
+::: silverlingua_openai
 options:
 members: true
 show_root_heading: true
