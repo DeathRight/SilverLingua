@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "An AI agent framework"
 authors = ["Travis Baldwin <travis@voidtavern.dev>"]
 packages = [
-    {include = "silverlingua", from = "src"},
+    {include = "SilverLingua", from = "src"},
     {include = "silverlingua_openai", from = "src"},
     {include = "silverlingua_anthropic", from = "src"}
 ]
