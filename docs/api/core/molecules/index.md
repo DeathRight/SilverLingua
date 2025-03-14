@@ -1,1 +1,1 @@
-::: silverlingua.core.molecules
+::: SilverLingua.core.molecules

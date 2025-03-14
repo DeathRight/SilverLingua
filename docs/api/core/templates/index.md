@@ -1,1 +1,1 @@
-::: silverlingua.core.templates
+::: SilverLingua.core.templates
