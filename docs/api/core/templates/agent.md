@@ -1,1 +1,1 @@
-::: silverlingua.core.templates.agent
+::: SilverLingua.core.templates.agent

@@ -1,1 +1,1 @@
-::: silverlingua.core.atoms.prompt
+::: SilverLingua.core.atoms.prompt

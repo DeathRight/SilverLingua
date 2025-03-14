@@ -1,1 +1,1 @@
-::: silverlingua.core.atoms.tokenizer
+::: SilverLingua.core.atoms.tokenizer
